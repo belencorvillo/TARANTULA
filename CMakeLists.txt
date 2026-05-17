@@ -12,29 +12,29 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 COMPONENTS Widgets REQUIRED)
 
 add_executable(TARANTULA_UI
-    main.cpp
-    MainWindow.cpp
-    MainWindow.h
-    MainWindow.ui
-    SpiderWidget.cpp
-    SpiderWidget.h
-    MotorController.cpp
-    MotorController.h
-    Leg.cpp
-    Leg.h
-    Tarantula.cpp
-    Tarantula.h
-    SimpleSerial.cpp
-    SimpleSerial.h
-    SteadyWinMotor.cpp
-    SteadyWinMotor.h
-    WaveshareInterface.cpp
-    WaveshareInterface.h
-    Config.h
+    src/main.cpp
+    src/MainWindow.cpp
+    include/MainWindow.h
+    src/MainWindow.ui
+    src/SpiderWidget.cpp
+    include/SpiderWidget.h
+    src/MotorController.cpp
+    include/MotorController.h
+    src/Leg.cpp
+    include/Leg.h
+    src/Tarantula.cpp
+    include/Tarantula.h
+    src/SimpleSerial.cpp
+    include/SimpleSerial.h
+    src/SteadyWinMotor.cpp
+    include/SteadyWinMotor.h
+    src/WaveshareInterface.cpp
+    include/WaveshareInterface.h
+    include/Config.h
 )
 
 target_link_libraries(TARANTULA_UI PRIVATE Qt6::Widgets)
-target_include_directories(TARANTULA_UI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(TARANTULA_UI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Set WIN32 definition since it was present in the VS project
 target_compile_definitions(TARANTULA_UI PRIVATE WIN32 _CONSOLE)
