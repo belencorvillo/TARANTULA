@@ -1,0 +1,26 @@
+=========================================================
+TEORÍA Y CAMBIOS: TRAYECTORIA TRAPEZOIDAL (MODO MIT)
+=========================================================
+
+1. EL PROBLEMA ANTERIOR (Tirones y Traqueteos)
+En el modo de control MIT, la controladora del motor utiliza un algoritmo PD (Proporcional-Derivativo) más un Feedforward de par (FF). La ecuación interna que resuelve el chip del motor a miles de hercios es:
+
+   Torque = Kp * (Pos_Deseada - Pos_Actual) + Kd * (Vel_Deseada - Vel_Actual) + Torque_FF
+
+En tu código anterior, estabas actualizando la "Pos_Deseada" poco a poco (8 rad/s), pero siempre le enviabas "Vel_Deseada = 0.0". 
+Esto provocaba que el factor 'Kd' actuara como un freno constante. Cada vez que la posición avanzaba, el motor quería moverse, pero el freno le decía que parase en seco. Esto generaba una sucesión de "micro-colisiones" de software que físicamente se traducían en un traqueteo o sonido estridente.
+
+2. LA SOLUCIÓN: TRAYECTORIA TRAPEZOIDAL GENUINA (Controlador de Raíz Cuadrada)
+Para lograr un movimiento fluido y profesional, necesitamos dos cosas:
+   a) Cambiar la posición de forma suave (acelerar, mantener velocidad, frenar).
+   b) Informar al motor de la velocidad exacta a la que estamos moviendo la posición objetivo (Velocity Feedforward).
+
+3. LA MATEMÁTICA IMPLEMENTADA EN MAIN.CPP
+Hemos implementado un "Generador de Perfiles de Velocidad" robusto:
+- Aceleración Constante: Cuando cambiamos el 'target_pos', el sistema acelera la velocidad (current_v) sumándole la Aceleración Máxima por el delta de tiempo (dt).
+- Velocidad de Crucero: La velocidad se topa al límite de 'traj_max_vel' (8.0 rad/s).
+- Deceleración Cinemática: Usamos la fórmula física del movimiento uniformemente acelerado (v = sqrt(2 * a * d)). A medida que el error de distancia se reduce, calculamos la velocidad límite que nos permite frenar justo a tiempo. El sistema desacelera naturalmente siguiendo esta curva.
+
+4. CAMBIOS REALIZADOS EN CÓDIGO
+- MotorController.h: Se han añadido las variables atómicas 'current_traj_vel', 'traj_max_vel' y 'traj_max_accel' para llevar el registro del estado físico real del movimiento y poder ajustarlas en el futuro si quieres movimientos más agresivos o más suaves.
+- main.cpp: Se ha reescrito la sección 'if (ctrl->is_trap_traj.load())' eliminando el avance lineal rígido e introduciendo el algoritmo trapezoidal con integración de Euler (current_p += current_v * dt). Finalmente, se pasa 'current_v' al parámetro 'mit.vel', informando correctamente al driver del motor.

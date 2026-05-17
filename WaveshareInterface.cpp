@@ -1,0 +1,141 @@
+#include "WaveshareInterface.h"
+#include "Config.h"
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+WaveshareInterface::WaveshareInterface(std::string portStr, int baudRate)
+    : port(portStr), baud(baudRate), is_connected(false) {
+    serial = new SimpleSerial(port, baud);
+}
+
+WaveshareInterface::~WaveshareInterface() {
+    close();
+    delete serial;
+}
+
+bool WaveshareInterface::connect() {
+    std::cout << "🔌 Abriendo puerto " << port << "...\n";
+    if (serial->connect()) {
+        is_connected = true;
+        configure_adapter_500k();
+        return true;
+    }
+    std::cout << "❌ Error critico de conexion.\n";
+    return false;
+}
+
+void WaveshareInterface::close() {
+    if (is_connected) {
+        serial->close();
+        is_connected = false;
+        std::cout << "🔌 Puerto cerrado.\n";
+    }
+}
+
+uint8_t WaveshareInterface::calculate_checksum(const std::vector<uint8_t>& payload) {
+    
+    //calcula checksum (suma de verificación final)
+
+    uint32_t sum = 0;
+    for (uint8_t b : payload) sum += b;
+    return static_cast<uint8_t>(sum & 0xFF);
+}
+
+void WaveshareInterface::configure_adapter_500k() {
+    std::cout << "🔧 Configurando adaptador a 500 Kbps...\n";
+    std::vector<uint8_t> frame(20, 0); // Crea una trama vacía de 20 ceros
+    frame[0] = Config::FRAME_HEAD_1; // 0xAA (Firma)
+    frame[1] = Config::FRAME_HEAD_2; // 0x55 (Firma)
+    frame[2] = Config::CMD_TYPE_CONFIG; // 0x02 (Modo Configuración)
+    frame[3] = Config::CAN_BAUD_500K; // 0x03 (Pon el motor a 500Kbps)
+    frame[4] = 0x01; // Trama estándar
+
+    // Calcula la suma de seguridad y la pone al final (byte 19)
+    //Bit de fin
+    std::vector<uint8_t> payload(frame.begin() + 2, frame.begin() + 19);
+    frame[19] = calculate_checksum(payload);
+
+        serial->writeBytes(frame);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+}
+
+void WaveshareInterface::send_can_frame(uint32_t can_id, const std::vector<uint8_t>& data_bytes) {
+    if (!is_connected) return;
+    std::vector<uint8_t> frame(20, 0);
+    frame[0] = Config::FRAME_HEAD_1; // 0xAA
+    frame[1] = Config::FRAME_HEAD_2; // 0x55
+    frame[2] = Config::CMD_TYPE_DATA; // 0x01 (enviar y recibir datos)
+    frame[3] = 0x01; //Tipo de Trama: Trama de Datos
+    frame[4] = 0x01; //ID de longitud estándar (11 bits)
+
+    // Little Endian ID (El dato que mandamos del ID es ID motor ≪ 5 | ID comando)
+    frame[5] = can_id & 0xFF;
+    frame[6] = (can_id >> 8) & 0xFF;
+    frame[7] = (can_id >> 16) & 0xFF;
+    frame[8] = (can_id >> 24) & 0xFF;
+    //la longitud de la trama de datos es de 8 bytes para protocolo MIT
+    uint8_t data_len = std::min((int)data_bytes.size(), 8);
+    frame[9] = data_len;
+
+    for (int i = 0; i < data_len; i++) {
+        frame[10 + i] = data_bytes[i];
+    }
+
+    //Calculamos el checksum entre los bytes 2 y 18
+    std::vector<uint8_t> payload(frame.begin() + 2, frame.begin() + 19);
+    frame[19] = calculate_checksum(payload);
+
+    serial->writeBytes(frame);
+}
+
+bool WaveshareInterface::receive_can_frame(uint32_t& can_id, std::vector<uint8_t>& data) {
+    if (!is_connected) return false;
+
+    //Tenemos dos buffers: uno temporal (chunk) y uno persistente (rx_buffer)
+
+    // Leemos todos los bytes que están llegando los metemos en el buffer persistente
+    int avail = serial->available(); //devuelve el número de bytes que ha recibido el adaptador
+    if (avail > 0) { //si hay al menos 1 byte esperando, se ejecuta
+        std::vector<uint8_t> chunk;
+        if (serial->readBytes(chunk, avail) > 0) { //mete ese número de bytes en el buffer chunk
+            rx_buffer.insert(rx_buffer.end(), chunk.begin(), chunk.end()); //insertamos el contenido de chunk en rx_buffer
+        }
+    }
+
+    // Buscamos una trama completa válida:
+    while (rx_buffer.size() >= 20) {
+        if (rx_buffer[0] == Config::FRAME_HEAD_1 && rx_buffer[1] == Config::FRAME_HEAD_2 && rx_buffer[2] == Config::CMD_TYPE_DATA) {
+            std::vector<uint8_t> payload(rx_buffer.begin() + 2, rx_buffer.begin() + 19);
+            uint8_t expected_checksum = calculate_checksum(payload);
+            
+            //verificamos si el checksum coincide
+            if (rx_buffer[19] == expected_checksum) {
+                can_id = rx_buffer[5] | (rx_buffer[6] << 8) | (rx_buffer[7] << 16) | (rx_buffer[8] << 24);
+                uint8_t length = rx_buffer[9];
+
+                data.clear();
+                for (int i = 0; i < length && i < 8; i++) {
+                    data.push_back(rx_buffer[10 + i]);
+                }
+                
+                // Eliminamos la trama procesada del buffer
+                rx_buffer.erase(rx_buffer.begin(), rx_buffer.begin() + 20);
+                return true;
+            } else {
+                // Checksum erróneo: posible corrupción, borramos 1 byte para resincronizar
+                rx_buffer.erase(rx_buffer.begin());
+            }
+        } else {
+            // Falso positivo (ruido o trama desalineada), borramos 1 solo byte para intentar sincronizar el framing
+            rx_buffer.erase(rx_buffer.begin());
+        }
+    }
+
+    // Proteger el buffer para que no crezca infinito por ruido absoluto 
+    if (rx_buffer.size() > 1024) {
+        rx_buffer.clear(); 
+    }
+
+    return false;
+}

@@ -1,0 +1,30 @@
+# Build directories
+/build/
+/build-*/
+/x64/
+/Debug/
+/Release/
+
+# Qt / Qt Creator local settings
+/.qtcreator/
+*.user
+*.user.*
+
+# Visual Studio local files
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+
+# Temporary files and research notes
+mi main perfecto.txt
+pdf_extracted.txt
+temp_mermaid.py
+*.html
+*.md
+
+# OS specific files
+Thumbs.db
+Desktop.ini
+.DS_Store
