@@ -231,7 +231,7 @@ void Tarantula::controlLoop()
             tickAllLegs(cycle_count);
             last_tick = std::chrono::steady_clock::now();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
 }
 

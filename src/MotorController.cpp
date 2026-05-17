@@ -167,7 +167,7 @@ void MotorController::enableSafely(int stiffness)
     active.store(true);
 
     // Esperar a que el motor reporte su posición
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Capturar la posición actual como offset (define el "cero lógico")
     pos_offset.store(last_known_pos.load() + pos_offset.load());
@@ -236,5 +236,5 @@ void MotorController::tick(int64_t now_ms, uint64_t cycle_count)
         MWGetEncoderEstimates(0, node_id);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    std::this_thread::sleep_for(std::chrono::milliseconds(6));
 }

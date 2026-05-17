@@ -50,7 +50,7 @@ public:
 
 private:
     int              leg_id_;
-    MotorController* motor_[3];  // [0]=q1  [1]=q2  [2]=q3
+    MotorController motor_[3];  // [0]=q1  [1]=q2  [2]=q3
 
     
     JointAngles solveIK(double x, double y, double z)                           const;

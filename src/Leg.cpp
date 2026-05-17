@@ -7,34 +7,32 @@
 
 Leg::Leg(int leg_id)
     : leg_id_(leg_id)
+    , motor_{
+        static_cast<uint8_t>(leg_id * 10 + 1),
+        static_cast<uint8_t>(leg_id * 10 + 2),
+        static_cast<uint8_t>(leg_id * 10 + 3)
+      }
 {
-    motor_[0] = new MotorController(leg_id * 10 + 1);
-    motor_[1] = new MotorController(leg_id * 10 + 2);
-    motor_[2] = new MotorController(leg_id * 10 + 3);
 }  
 
 Leg::~Leg()
 {
-    delete motor_[0];
-    delete motor_[1];
-    delete motor_[2];
 }
 
 
 void Leg::enable()
 {
     for (int j = 0; j < 3; ++j) {
-        if (motor_[j]) motor_[j]->enableSafely(3);
+        motor_[j].enableSafely(3);
     }
 }
 
 void Leg::disable()
 {
     for (int j = 0; j < 3; ++j) {
-        if (!motor_[j]) continue;
-        MWSetAxisState(0, motor_[j]->node_id, MW_AXIS_STATE_IDLE);
-        motor_[j]->active.store(false);
-        motor_[j]->is_trap_traj.store(false);
+        MWSetAxisState(0, motor_[j].node_id, MW_AXIS_STATE_IDLE);
+        motor_[j].active.store(false);
+        motor_[j].is_trap_traj.store(false);
     }
 }
 
@@ -42,7 +40,7 @@ bool Leg::isEnabled() const
 {
     // La pata se considera habilitada si al menos un motor está activo
     for (int j = 0; j < 3; ++j)
-        if (motor_[j] && motor_[j]->active.load(std::memory_order_relaxed))
+        if (motor_[j].active.load(std::memory_order_relaxed))
             return true;
     return false;
 }
@@ -59,10 +57,9 @@ bool Leg::extendToPosition(double x, double y, double z)
 void Leg::moveJoint(int joint, float pos_deg, int stiffness)
 {
     if (joint < 1 || joint > 3) return;
-    MotorController* m = motor_[joint - 1];
-    if (!m) return;
+    MotorController& m = motor_[joint - 1];
 
-    m->setTarget(pos_deg * static_cast<float>(M_PI / 180.0), stiffness);
+    m.setTarget(pos_deg * static_cast<float>(M_PI / 180.0), stiffness);
 }
 
 void Leg::waitUntilSettled(const std::atomic<bool>& sequence_active,
@@ -72,7 +69,7 @@ void Leg::waitUntilSettled(const std::atomic<bool>& sequence_active,
     while (!all_settled && sequence_active.load()) {
         all_settled = true;
         for (int j = 0; j < 3; ++j) {
-            if (motor_[j] && !motor_[j]->isSettled(tolerance_deg)) {
+            if (!motor_[j].isSettled(tolerance_deg)) {
                 all_settled = false;
                 break;
             }
@@ -94,8 +91,8 @@ bool Leg::isGrounded() const
 
 float Leg::getJointAngle(int joint) const
 {
-    if (joint < 1 || joint > 3 || !motor_[joint - 1]) return 0.0f;
-    return motor_[joint - 1]->last_known_pos.load(std::memory_order_relaxed)
+    if (joint < 1 || joint > 3) return 0.0f;
+    return motor_[joint - 1].last_known_pos.load(std::memory_order_relaxed)
            * static_cast<float>(180.0 / M_PI);
 }
 
@@ -148,8 +145,8 @@ void Leg::applyAngles(const JointAngles& angles)
     int stiffnesses[3] = { 3, 3, 4 };
 
     for (int i = 0; i < 3; ++i) {
-        if (motor_[i] && motor_[i]->active.load(std::memory_order_relaxed)) {
-            motor_[i]->setTarget(static_cast<float>(qs[i]), stiffnesses[i]);
+        if (motor_[i].active.load(std::memory_order_relaxed)) {
+            motor_[i].setTarget(static_cast<float>(qs[i]), stiffnesses[i]);
         }
     }
 }
@@ -157,21 +154,21 @@ void Leg::applyAngles(const JointAngles& angles)
 void Leg::enableJoint(int joint)
 {
     if (joint >= 1 && joint <= 3) {
-        if (motor_[joint - 1]) motor_[joint - 1]->enableSafely(3);
+        motor_[joint - 1].enableSafely(3);
     }
 }
 
 void Leg::tick(int64_t now_ms, uint64_t cycle_count)
 {
     for (int j = 0; j < 3; ++j) {
-        if (motor_[j]) motor_[j]->tick(now_ms, cycle_count);
+        motor_[j].tick(now_ms, cycle_count);
     }
 }
 
 bool Leg::isAnyMotorOnline() const
 {
     for (int j = 0; j < 3; ++j) {
-        if (motor_[j] && motor_[j]->motor_online.load(std::memory_order_relaxed))
+        if (motor_[j].motor_online.load(std::memory_order_relaxed))
             return true;
     }
     return false;
@@ -180,7 +177,7 @@ bool Leg::isAnyMotorOnline() const
 void Leg::sendIdleToAllMotors()
 {
     for (int j = 0; j < 3; ++j) {
-        if (motor_[j]) MWSetAxisState(0, motor_[j]->node_id, MW_AXIS_STATE_IDLE);
+        MWSetAxisState(0, motor_[j].node_id, MW_AXIS_STATE_IDLE);
     }
 }
 
@@ -189,21 +186,19 @@ void Leg::handleCanFrame(uint32_t can_id, const std::vector<uint8_t>& data)
     uint8_t motor_id = can_id >> 5;
     int joint_idx = (motor_id % 10) - 1;
     if (joint_idx >= 0 && joint_idx < 3) {
-        MotorController* ctrl = motor_[joint_idx];
-        if (ctrl) {
-            ctrl->motor_online.store(true, std::memory_order_relaxed);
-            auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
-            ctrl->last_msg_time_ms.store(now_ms, std::memory_order_relaxed);
+        MotorController& ctrl = motor_[joint_idx];
+        ctrl.motor_online.store(true, std::memory_order_relaxed);
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        ctrl.last_msg_time_ms.store(now_ms, std::memory_order_relaxed);
 
-            if (data.size() == 8) {
-                MWReceiver(0, can_id, const_cast<uint8_t*>(data.data()));
-                MW_CMD_ID cmd = static_cast<MW_CMD_ID>(can_id & 0x1F);
-                if (cmd == MW_MIT_CONTROL_CMD) {
-                    ctrl->update_from_mit_frame();
-                } else if (cmd == MW_GET_ENCODER_ESTIMATES_CMD) {
-                    ctrl->update_from_encoder_frame();
-                }
+        if (data.size() == 8) {
+            MWReceiver(0, can_id, const_cast<uint8_t*>(data.data()));
+            MW_CMD_ID cmd = static_cast<MW_CMD_ID>(can_id & 0x1F);
+            if (cmd == MW_MIT_CONTROL_CMD) {
+                ctrl.update_from_mit_frame();
+            } else if (cmd == MW_GET_ENCODER_ESTIMATES_CMD) {
+                ctrl.update_from_encoder_frame();
             }
         }
     }
