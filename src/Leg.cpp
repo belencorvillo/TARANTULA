@@ -8,9 +8,9 @@
 Leg::Leg(int leg_id)
     : leg_id_(leg_id)
     , motor_{
-        static_cast<uint8_t>(leg_id * 10 + 1),
-        static_cast<uint8_t>(leg_id * 10 + 2),
-        static_cast<uint8_t>(leg_id * 10 + 3)
+        {static_cast<uint8_t>(leg_id * 10 + 1), false},
+        {static_cast<uint8_t>(leg_id * 10 + 2), true},  // Motor X2 (fémur) invertido mecánicamente
+        {static_cast<uint8_t>(leg_id * 10 + 3), false}
       }
 {
 }  

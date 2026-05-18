@@ -6,7 +6,7 @@
 WaveshareInterface* g_comm = nullptr; //puntero global que apuntará a mi Waveshare (lo iniciamos vacío hasta conectarlo)
 MotorController* g_controllers[128] = { nullptr }; //motores conectados (el máximo es 128)
 
-MotorController :: MotorController(uint8_t id) : node_id(id) {
+MotorController::MotorController(uint8_t id, bool reversed) : node_id(id), reversed(reversed) {
     memset(&motorData, 0, sizeof(MW_MOTOR_DATA)); //limpiamos la memoria
 
     MW_MOTOR_ACCESS_INFO access_info;
@@ -34,25 +34,19 @@ MotorController :: ~MotorController() { g_controllers[node_id] = nullptr; }
 // CONVERSIÓN DE COORDENADAS
 // ─────────────────────────────────────────────────────────────
 
-bool MotorController::is_x2() const {
-    // Los motores X2 (articulación de fémur) tienen ID terminado en 2.
-    // Su sentido de giro es el opuesto al convenio lógico del sistema.
-    return (node_id == 12 || node_id == 22 || node_id == 32 || node_id == 42);
-}
-
 float MotorController::convert_dir(float val) const {
-    // Invierte el signo para motores X2 (dirección física invertida)
-    return is_x2() ? -val : val;
+    // Invierte el signo si el motor está invertido mecánicamente
+    return reversed ? -val : val;
 }
 
 float MotorController::phys_to_logic(float phys_pos) const {
-    // La posición física del rotor X2 está invertida respecto al cero lógico
-    return is_x2() ? -phys_pos : phys_pos;
+    // La posición física está invertida respecto al cero lógico si reversed es true
+    return reversed ? -phys_pos : phys_pos;
 }
 
 float MotorController::logic_to_phys(float log_pos) const {
-    // La posición lógica del sistema se invierte para enviarla al motor X2
-    return is_x2() ? -log_pos : log_pos;
+    // La posición lógica se invierte para enviarla al motor si reversed es true
+    return reversed ? -log_pos : log_pos;
 }
 
 // ─────────────────────────────────────────────────────────────

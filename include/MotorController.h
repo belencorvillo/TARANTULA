@@ -20,6 +20,7 @@ extern class MotorController* g_controllers[128];
 class MotorController {
 public:
     uint8_t node_id;
+    bool reversed;
     MW_MOTOR_DATA motorData;
 
     // Comandos
@@ -45,11 +46,10 @@ public:
     std::atomic<float> last_known_torque{ 0.0f };
     std::atomic<float> pos_offset{ 0.0f }; //podríamos ponerlo como no atomic porque realmente solo se calcula una vez, pero me da miedo que si le doy varias veces al botón de encender se me raye
 
-    MotorController(uint8_t id);
+    MotorController(uint8_t id, bool reversed = false);
     ~MotorController();
 
     
-    bool is_x2() const;
     float convert_dir(float val) const;
     float phys_to_logic(float phys_pos) const;
     float logic_to_phys(float log_pos) const;
