@@ -230,5 +230,5 @@ void MotorController::tick(int64_t now_ms, uint64_t cycle_count)
         MWGetEncoderEstimates(0, node_id);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(6));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
