@@ -6,6 +6,7 @@
 #include <chrono>
 #include "Leg.h"
 #include "WaveshareInterface.h"
+#include <Eigen/Dense>
 
 extern const double SEND_FREQUENCY;
 
@@ -39,6 +40,8 @@ private:
    
     WaveshareInterface& comm_;
     std::array<Leg*, 4> legs_;  
+    bool feet_captured_{ false };
+    std::array<Eigen::Vector3d, 4> initial_feet_positions_;
     
     std::atomic<bool> running_{ false };
     std::thread       rx_thread_;
@@ -53,9 +56,8 @@ private:
 
     // Captura las posiciones actuales de los pies mediante FK
     void captureFeetPositions();
-    // Dado un pose del cuerpo, calcula la posición de cada extremo de la pata
-    Vec3 computeFootTargetForLeg(int leg_idx, double dx, double dy, double dz,
-                                 double roll, double pitch) const;
+    Eigen::Vector3d computeFootTargetForLeg(int leg_idx, double dx, double dy, double dz,
+                                         double roll, double pitch) const;
 
     void runStandUpSequence();
     void runSitDownSequence();

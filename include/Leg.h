@@ -7,9 +7,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-struct Vec3 {
-    double x = 0.0, y = 0.0, z = 0.0;
-};
+#include <Eigen/Dense>
 
 struct JointAngles {
     double q1 = 0.0;   
@@ -43,7 +41,7 @@ public:
    
     bool  isGrounded()             const;  // para cuando implemente los sensores de efecto Hall
     float getJointAngle(int joint) const;  
-    // Vec3  getCurrentFootPosition() const; // con cinemática directa
+    Eigen::Vector3d getCurrentFootPosition() const; // con cinemática directa
 
     
     int id() const { return leg_id_; }
@@ -60,7 +58,7 @@ private:
     bool        isWithinJointLimits(const JointAngles& angles)                  const;
 
     
-    Vec3 forwardKinematics(double q1, double q2, double q3)                     const;
+    Eigen::Vector3d forwardKinematics(double q1, double q2, double q3)                     const;
 
     //aplica los ángulos a los motores
     void applyAngles(const JointAngles& angles);

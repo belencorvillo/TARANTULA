@@ -197,18 +197,46 @@ void MainWindow::on_btnSendIndividual_clicked()
 }
 
 
-void MainWindow::on_sliderBodyX_valueChanged(int)     { /* COMPLETAR CON CINEMÁTICA INVERSA */ }
-void MainWindow::on_sliderBodyY_valueChanged(int)     { /* COMPLETAR CON CINEMÁTICA INVERSA */ }
-void MainWindow::on_sliderBodyZ_valueChanged(int)     { /* COMPLETAR CON CINEMÁTICA INVERSA */ }
-void MainWindow::on_sliderBodyRoll_valueChanged(int)  { /* COMPLETAR CON CINEMÁTICA INVERSA */ }
-void MainWindow::on_sliderBodyPitch_valueChanged(int) { /* COMPLETAR CON CINEMÁTICA INVERSA */ }
+void MainWindow::on_sliderBodyX_valueChanged(int)     { sendCurrentBodyPose(); }
+void MainWindow::on_sliderBodyY_valueChanged(int)     { sendCurrentBodyPose(); }
+void MainWindow::on_sliderBodyZ_valueChanged(int)     { sendCurrentBodyPose(); }
+void MainWindow::on_sliderBodyRoll_valueChanged(int)  { sendCurrentBodyPose(); }
+void MainWindow::on_sliderBodyPitch_valueChanged(int) { sendCurrentBodyPose(); }
 
 void MainWindow::sendCurrentBodyPose()
 {
-    // COMPLETAR CON CINEMÁTICA INVERSA
+    static constexpr double SLIDER_XYZ_SCALE   = 0.001;
+    static constexpr double SLIDER_ANGLE_SCALE = M_PI / 180.0;
+
+    double dx    = ui->sliderBodyX->value() * SLIDER_XYZ_SCALE;
+    double dy    = ui->sliderBodyY->value() * SLIDER_XYZ_SCALE;
+    double dz    = ui->sliderBodyZ->value() * SLIDER_XYZ_SCALE;
+    double roll  = ui->sliderBodyRoll->value() * SLIDER_ANGLE_SCALE;
+    double pitch = ui->sliderBodyPitch->value() * SLIDER_ANGLE_SCALE;
+
+    robot_->setBodyPose(dx, dy, dz, roll, pitch);
 }
 
 void MainWindow::on_btnResetPose_clicked()
 {
-    // COMPLETAR CON CINEMÁTICA INVERSA
+    ui->sliderBodyX->blockSignals(true);
+    ui->sliderBodyY->blockSignals(true);
+    ui->sliderBodyZ->blockSignals(true);
+    ui->sliderBodyRoll->blockSignals(true);
+    ui->sliderBodyPitch->blockSignals(true);
+
+    ui->sliderBodyX->setValue(0);
+    ui->sliderBodyY->setValue(0);
+    ui->sliderBodyZ->setValue(0);
+    ui->sliderBodyRoll->setValue(0);
+    ui->sliderBodyPitch->setValue(0);
+
+    ui->sliderBodyX->blockSignals(false);
+    ui->sliderBodyY->blockSignals(false);
+    ui->sliderBodyZ->blockSignals(false);
+    ui->sliderBodyRoll->blockSignals(false);
+    ui->sliderBodyPitch->blockSignals(false);
+
+    robot_->resetBodyPoseReference();
+    robot_->setBodyPose(0.0, 0.0, 0.0, 0.0, 0.0);
 }
