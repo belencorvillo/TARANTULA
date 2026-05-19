@@ -99,9 +99,17 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
         captureFeetPositions();
     }
 
+    int s1 = 3, s2 = 4, s3 = 4;
+    // If we are commanding translation in X or Y, increase all joint stiffnesses to 5 to prevent slipping
+    if (std::abs(dx) > 1e-5 || std::abs(dy) > 1e-5) {
+        s1 = 5;
+        s2 = 5;
+        s3 = 5;
+    }
+
     for (int i = 0; i < 4; ++i) {
         Eigen::Vector3d local_target = computeFootTargetForLeg(i, dx, dy, dz, roll, pitch);
-        legs_[i]->extendToPosition(local_target.x(), local_target.y(), local_target.z());
+        legs_[i]->extendToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
     }
 }
 
@@ -112,8 +120,42 @@ void Tarantula::resetBodyPoseReference()
 
 void Tarantula::captureFeetPositions()
 {
+    // Use the nominal initial angles to compute the reference foot positions in the global body frame
+    double ref_q1 = 0.0;
+    double ref_q2 = 24.0 * M_PI / 180.0;
+    double ref_q3 = -100.0 * M_PI / 180.0;
+
+    double L1 = 0.08;
+    double L2 = 0.19;
+    double L3 = 0.225;
+
+    // Nominal local position
+    double r = L1 + L2 * std::cos(ref_q2) + L3 * std::cos(ref_q2 + ref_q3);
+    double x_local = r * std::cos(ref_q1);
+    double y_local = r * std::sin(ref_q1);
+    double z_local = L2 * std::sin(ref_q2) + L3 * std::sin(ref_q2 + ref_q3);
+
+    Eigen::Vector3d p_local(x_local, y_local, z_local);
+
     for (int i = 0; i < 4; ++i) {
-        initial_feet_positions_[i] = legs_[i]->getCurrentFootPosition();
+        double theta = 0.0;
+        if      (i == 0) theta = -M_PI / 4.0;
+        else if (i == 1) theta =  M_PI / 4.0;
+        else if (i == 2) theta =  3.0 * M_PI / 4.0;
+        else if (i == 3) theta = -3.0 * M_PI / 4.0;
+
+        double R_hip = 0.15; // 15cm radius
+        double x_off = R_hip * std::cos(theta);
+        double y_off = R_hip * std::sin(theta);
+
+        double cos_t = std::cos(theta);
+        double sin_t = std::sin(theta);
+
+        double x_body = p_local.x() * cos_t - p_local.y() * sin_t + x_off;
+        double y_body = p_local.x() * sin_t + p_local.y() * cos_t + y_off;
+        double z_body = p_local.z();
+
+        initial_feet_positions_[i] = Eigen::Vector3d(x_body, y_body, z_body);
     }
     feet_captured_ = true;
 }
@@ -127,16 +169,16 @@ Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy
     Eigen::Vector3d p_global = initial_feet_positions_[idx];
 
     // 2. Rotate and translate body torso
-    // R_body = R_y(pitch) * R_x(roll)
+    // R_body = R_y(roll) * R_x(pitch)
     double cr = std::cos(roll);
     double sr = std::sin(roll);
     double cp = std::cos(pitch);
     double sp = std::sin(pitch);
 
     Eigen::Matrix3d R_body;
-    R_body << cp,  sp*sr,  sp*cr,
-              0.0,    cr,    -sr,
-             -sp,  cp*sr,  cp*cr;
+    R_body << cr,  sr*sp,  sr*cp,
+              0.0,    cp,    -sp,
+             -sr,  cr*sp,  cr*cp;
 
     Eigen::Vector3d T(dx, dy, dz);
 
@@ -191,10 +233,10 @@ void Tarantula::abortSequence()
 void Tarantula::runStandUpSequence()
 {
     for (Leg* leg : legs_) {
-    leg->moveJoint(2, 20.0f, 4);
-    leg->moveJoint(3, -100.0f, 4);
-}
-
+        leg->moveJoint(1, 0.0f, 3);
+        leg->moveJoint(2, 24.0f, 4);
+        leg->moveJoint(3, -100.0f, 4);
+    }
     sequence_active_.store(false);
 }
 

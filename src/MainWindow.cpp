@@ -205,14 +205,26 @@ void MainWindow::on_sliderBodyPitch_valueChanged(int) { sendCurrentBodyPose(); }
 
 void MainWindow::sendCurrentBodyPose()
 {
-    static constexpr double SLIDER_XYZ_SCALE   = 0.001;
+    static constexpr double SLIDER_XYZ_SCALE   = 0.001; // 1 unit = 1 mm (0.001 m)
     static constexpr double SLIDER_ANGLE_SCALE = M_PI / 180.0;
 
-    double dx    = ui->sliderBodyX->value() * SLIDER_XYZ_SCALE;
-    double dy    = ui->sliderBodyY->value() * SLIDER_XYZ_SCALE;
-    double dz    = ui->sliderBodyZ->value() * SLIDER_XYZ_SCALE;
-    double roll  = ui->sliderBodyRoll->value() * SLIDER_ANGLE_SCALE;
-    double pitch = ui->sliderBodyPitch->value() * SLIDER_ANGLE_SCALE;
+    int valX = ui->sliderBodyX->value();
+    int valY = ui->sliderBodyY->value();
+    int valZ = ui->sliderBodyZ->value();
+    int valRoll = ui->sliderBodyRoll->value();
+    int valPitch = ui->sliderBodyPitch->value();
+
+    ui->lblBodyX->setText(QString("%1 mm").arg(valX));
+    ui->lblBodyY->setText(QString("%1 mm").arg(valY));
+    ui->lblBodyZ->setText(QString("%1 mm").arg(valZ));
+    ui->lblBodyRoll->setText(QString("%1°").arg(valRoll));
+    ui->lblBodyPitch->setText(QString("%1°").arg(valPitch));
+
+    double dx    = valX * SLIDER_XYZ_SCALE;
+    double dy    = valY * SLIDER_XYZ_SCALE;
+    double dz    = valZ * SLIDER_XYZ_SCALE;
+    double roll  = valRoll * SLIDER_ANGLE_SCALE;
+    double pitch = valPitch * SLIDER_ANGLE_SCALE;
 
     robot_->setBodyPose(dx, dy, dz, roll, pitch);
 }
@@ -236,6 +248,12 @@ void MainWindow::on_btnResetPose_clicked()
     ui->sliderBodyZ->blockSignals(false);
     ui->sliderBodyRoll->blockSignals(false);
     ui->sliderBodyPitch->blockSignals(false);
+
+    ui->lblBodyX->setText("0 mm");
+    ui->lblBodyY->setText("0 mm");
+    ui->lblBodyZ->setText("0 mm");
+    ui->lblBodyRoll->setText("0°");
+    ui->lblBodyPitch->setText("0°");
 
     robot_->resetBodyPoseReference();
     robot_->setBodyPose(0.0, 0.0, 0.0, 0.0, 0.0);

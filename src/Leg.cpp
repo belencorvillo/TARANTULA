@@ -45,12 +45,12 @@ bool Leg::isEnabled() const
     return false;
 }
 
-bool Leg::extendToPosition(double x, double y, double z)
+bool Leg::extendToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3)
 {
     //ESTO LO USAREMOS CUANDO TENGA LA CINEMÁTICA INVERSA
     JointAngles angles = solveIK(x, y, z);
     if (!angles.valid) return false;
-    applyAngles(angles);
+    applyAngles(angles, stiffness_q1, stiffness_q2, stiffness_q3);
     return true;
 }
 
@@ -178,7 +178,7 @@ bool Leg::isWithinJointLimits(const JointAngles& a) const
     double q3_deg = a.q3 * 180.0 / M_PI;
 
     // Safe thresholds
-    if (q1_deg < -90.0 || q1_deg > 90.0) return false;
+    if (q1_deg < -45.0 || q1_deg > 45.0) return false;
     if (q2_deg < -60.0 || q2_deg > 90.0) return false;
     if (q3_deg < -150.0 || q3_deg > 0.0) return false;
 
@@ -202,10 +202,10 @@ Eigen::Vector3d Leg::forwardKinematics(double q1, double q2, double q3) const
 }
 
 
-void Leg::applyAngles(const JointAngles& angles)
+void Leg::applyAngles(const JointAngles& angles, int stiffness_q1, int stiffness_q2, int stiffness_q3)
 {
     double qs[3] = { angles.q1, angles.q2, angles.q3 };
-    int stiffnesses[3] = { 3, 3, 4 };
+    int stiffnesses[3] = { stiffness_q1, stiffness_q2, stiffness_q3 };
 
     for (int i = 0; i < 3; ++i) {
         if (motor_[i].active.load(std::memory_order_relaxed)) {
