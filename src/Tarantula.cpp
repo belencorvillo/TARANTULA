@@ -81,9 +81,8 @@ void Tarantula::disableAllLegs()
 
 void Tarantula::moveLeg(int leg_id, double x, double y, double z)
 {
-    //Para cuando haya calculado la cinemática inversa
     if (leg_id < 1 || leg_id > 4) return;
-    legs_[leg_id - 1]->extendToPosition(x, y, z);
+    legs_[leg_id - 1]->goToPosition(x, y, z);
 }
 
 void Tarantula::moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness)
@@ -99,8 +98,8 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
         captureFeetPositions();
     }
 
-    int s1 = 3, s2 = 4, s3 = 4;
-    // If we are commanding translation in X or Y, increase all joint stiffnesses to 5 to prevent slipping
+    int s1 = 3, s2 = 4, s3 = 4; //rigidez predeterminada
+    //si movemos el eje x o y ponemos todos los motores con máxima rigidez para que no deslice
     if (std::abs(dx) > 1e-5 || std::abs(dy) > 1e-5) {
         s1 = 5;
         s2 = 5;
@@ -109,7 +108,7 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
 
     for (int i = 0; i < 4; ++i) {
         Eigen::Vector3d local_target = computeFootTargetForLeg(i, dx, dy, dz, roll, pitch);
-        legs_[i]->extendToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
+        legs_[i]->goToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
     }
 }
 
@@ -120,16 +119,17 @@ void Tarantula::resetBodyPoseReference()
 
 void Tarantula::captureFeetPositions()
 {
-    // Use the nominal initial angles to compute the reference foot positions in the global body frame
+    // Usamos los ángulos de la posición de inicio de los comandos de cinemática inversa
     double ref_q1 = 0.0;
     double ref_q2 = 24.0 * M_PI / 180.0;
     double ref_q3 = -100.0 * M_PI / 180.0;
 
+    //Longitudes entre los motores de las patas
     double L1 = 0.08;
     double L2 = 0.19;
     double L3 = 0.225;
 
-    // Nominal local position
+    // Posición del extremo de la pata respecto su referencia local (eje q1)
     double r = L1 + L2 * std::cos(ref_q2) + L3 * std::cos(ref_q2 + ref_q3);
     double x_local = r * std::cos(ref_q1);
     double y_local = r * std::sin(ref_q1);
@@ -138,6 +138,7 @@ void Tarantula::captureFeetPositions()
     Eigen::Vector3d p_local(x_local, y_local, z_local);
 
     for (int i = 0; i < 4; ++i) {
+        //Las patas están a 90 grados unas de otras
         double theta = 0.0;
         if      (i == 0) theta = -M_PI / 4.0;
         else if (i == 1) theta =  M_PI / 4.0;
@@ -151,11 +152,12 @@ void Tarantula::captureFeetPositions()
         double cos_t = std::cos(theta);
         double sin_t = std::sin(theta);
 
-        double x_body = p_local.x() * cos_t - p_local.y() * sin_t + x_off;
-        double y_body = p_local.x() * sin_t + p_local.y() * cos_t + y_off;
-        double z_body = p_local.z();
+        //Coordenadas del extremo de la pata en el sistema de referencia del cuerpo (Ecuaciones de rotación y traslación)
+        double x_foot_body = p_local.x() * cos_t - p_local.y() * sin_t + x_off;
+        double y_foot_body = p_local.x() * sin_t + p_local.y() * cos_t + y_off;
+        double z_foot_body = p_local.z();
 
-        initial_feet_positions_[i] = Eigen::Vector3d(x_body, y_body, z_body);
+        initial_feet_positions_[i] = Eigen::Vector3d(x_foot_body, y_foot_body, z_foot_body);
     }
     feet_captured_ = true;
 }
@@ -165,10 +167,10 @@ Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy
 {
     if (!feet_captured_) return Eigen::Vector3d::Zero();
 
-    // 1. Position in the global frame relative to the neutral body center
+    // Posición de pie inicial respecto del cuerpo
     Eigen::Vector3d p_global = initial_feet_positions_[idx];
 
-    // 2. Rotate and translate body torso
+    // Rotación y traslación del cuerpo
     // R_body = R_y(roll) * R_x(pitch)
     double cr = std::cos(roll);
     double sr = std::sin(roll);
@@ -182,26 +184,27 @@ Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy
 
     Eigen::Vector3d T(dx, dy, dz);
 
-    // Compute foot coordinate relative to body torso: P_body = R_body^T * (P_global - T)
+    //Siendo P_body dónde se encuentra el pie respecto al nuevo cuerpo movido
+    // P_body = R_body^T * (P_global - T)
     Eigen::Vector3d p_body = R_body.transpose() * (p_global - T);
 
-    // 3. Coordinate conversion from body frame {B} to local leg frame {L_idx}
+    // Cambiar de sistemas de coordenadas del cuerpo a sistemas de coordenadas de la pata 
     double theta = 0.0;
     if      (idx == 0) theta = -M_PI / 4.0;
     else if (idx == 1) theta =  M_PI / 4.0;
     else if (idx == 2) theta =  3.0 * M_PI / 4.0;
     else if (idx == 3) theta = -3.0 * M_PI / 4.0;
 
-    double R_hip = 0.15; // 15cm radius
+    double R_hip = 0.15; 
     double x_off = R_hip * std::cos(theta);
     double y_off = R_hip * std::sin(theta);
 
-    // Translate to local hip joint
+    
     double x_rel = p_body.x() - x_off;
     double y_rel = p_body.y() - y_off;
     double z_rel = p_body.z();
 
-    // Rotate to align with local leg X axis (yaw alignment)
+    // Rotación y traslación
     double x_local = x_rel * std::cos(theta) + y_rel * std::sin(theta);
     double y_local = -x_rel * std::sin(theta) + y_rel * std::cos(theta);
     double z_local = z_rel;

@@ -45,7 +45,7 @@ bool Leg::isEnabled() const
     return false;
 }
 
-bool Leg::extendToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3)
+bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3)
 {
     //ESTO LO USAREMOS CUANDO TENGA LA CINEMÁTICA INVERSA
     JointAngles angles = solveIK(x, y, z);
@@ -108,45 +108,54 @@ Eigen::Vector3d Leg::getCurrentFootPosition() const
 
 JointAngles Leg::solveIK(double x, double y, double z) const
 {
+
+    // Longitudes entre ejes de los motores:
+    double L1 = 0.08; //Coxa (q1 y q2)
+    double L2 = 0.19;  // Femur (q2 y q3)
+    double L3 = 0.225; // Tibia (q3 y efector final)
+
+
     JointAngles angles;
     angles.valid = false;
 
-    // 1. Coxa angle q1 (yaw)
-    double q1 = std::atan2(y, x);
+    // Ángulo de q1 (yaw)
+    double q1 = std::atan2(y, x); // ec 137, pág 44
 
-    // 2. Project to 2D vertical plane
-    double s = std::sqrt(x * x + y * y);
-    double s_femur = s - 0.08; // L1 = 0.08m (8cm coxa length)
-    double d = z;
+    // Proyectamos a plano xy:
 
+    //distancia horizontal desde q1 hasta el punto: 
+    double s = std::sqrt(x * x + y * y); // ec 138, pág 44
+    //si queremos saber esa distancia desde q2:
+    double s_femur = s - L1; //ec 139, pág 44
+    //distancia en dirección vertical:
+    double d = z; //ec 140, pág 44
+
+    //El punto que queremos alcanzar es (s_femur,d)
     if (!isWithinReach(s_femur, d)) {
         return angles;
     }
 
-    // Link lengths
-    double L2 = 0.19;  // Femur length
-    double L3 = 0.225; // Tibia length
-    double D2 = s_femur * s_femur + d * d;
+    double D2 = s_femur * s_femur + d * d; //ec auxiliar
 
-    // 3. Solve tibia q3 (knee-up configuration)
-    double cosVal = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3);
-    cosVal = std::max(-1.0, std::min(1.0, cosVal)); // Clamp de seguridad indispensable
     
-    double q3 = std::acos(cosVal);
-    // Since physical q3 is negative when bent (knee-up posture), we apply the negative sign
+    double cosq3 = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3); //ec 145, pág 45
+    cosq3 = std::max(-1.0, std::min(1.0, cosq3)); // Clamp de seguridad indispensable ????
+    
+    double q3 = std::acos(cosq3);
+    // Como queremos que esté en postura arácnida (rodilla arriba), aplicamos el ángulo negativo:
     angles.q3 = -q3;
 
-    // 4. Solve femur q2
+    // Obtenemos el ángulo q2 por la ley de los cosenos:
     double alpha1 = std::atan2(d, s_femur);
     double cosAlpha2 = (L2 * L2 + D2 - L3 * L3) / (2.0 * L2 * std::sqrt(D2));
     cosAlpha2 = std::max(-1.0, std::min(1.0, cosAlpha2));
     double alpha2 = std::acos(cosAlpha2);
 
-    // For standard knee-up stance:
+    // Para posición con rodilla arriba:
     angles.q2 = alpha1 + alpha2;
     angles.q1 = q1;
     
-    // Check joint physical limits
+    // Mirar si es viable:
     if (isWithinJointLimits(angles)) {
         angles.valid = true;
     }
@@ -154,14 +163,7 @@ JointAngles Leg::solveIK(double x, double y, double z) const
     return angles;
 }
 
-JointAngles Leg::solveOneBranch(double q1, double s, double d, bool knee_out) const
-{
-    // Helper to solve in 2D directly (s is horizontal, d is vertical)
-    double x = (s + 0.08) * std::cos(q1);
-    double y = (s + 0.08) * std::sin(q1);
-    double z = d;
-    return solveIK(x, y, z);
-}
+
 
 bool Leg::isWithinReach(double s, double d) const
 {
@@ -177,10 +179,10 @@ bool Leg::isWithinJointLimits(const JointAngles& a) const
     double q2_deg = a.q2 * 180.0 / M_PI;
     double q3_deg = a.q3 * 180.0 / M_PI;
 
-    // Safe thresholds
+    // límites
     if (q1_deg < -45.0 || q1_deg > 45.0) return false;
     if (q2_deg < -60.0 || q2_deg > 90.0) return false;
-    if (q3_deg < -150.0 || q3_deg > 0.0) return false;
+    if (q3_deg < -150.0 || q3_deg > 0.0) return false; //para que siempre sea "rodilla arriba"
 
     return true;
 }
@@ -192,11 +194,11 @@ Eigen::Vector3d Leg::forwardKinematics(double q1, double q2, double q3) const
     double L2 = 0.19;
     double L3 = 0.225;
 
-    // Forward Kinematics formulas:
-    double r = L1 + L2 * std::cos(q2) + L3 * std::cos(q2 + q3);
-    double x = r * std::cos(q1);
-    double y = r * std::sin(q1);
-    double z = L2 * std::sin(q2) + L3 * std::sin(q2 + q3);
+    // Fórmulas de cinemática directa (pg documentación de Guille):
+    double r = L1 + L2 * std::cos(q2) + L3 * std::cos(q2 + q3); //ec 120, pág 40 (parámetro auxiliar)
+    double x = r * std::cos(q1); //ec 119, pag 40
+    double y = r * std::sin(q1); //ec 119, pag 40
+    double z = L2 * std::sin(q2) + L3 * std::sin(q2 + q3); //ec 119, pag 40
 
     return Eigen::Vector3d(x, y, z);
 }

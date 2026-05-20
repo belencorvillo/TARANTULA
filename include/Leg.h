@@ -33,7 +33,7 @@ public:
     void handleCanFrame(uint32_t can_id, const std::vector<uint8_t>& data);
 
     
-    bool extendToPosition(double x, double y, double z, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4); //para cuando tenga la cinemática inversa
+    bool goToPosition(double x, double y, double z, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4); //para cuando tenga la cinemática inversa
     void moveJoint(int joint, float pos_deg, int stiffness);
     void waitUntilSettled(const std::atomic<bool>& sequence_active,
                           float tolerance_deg = 10.0f) const;
@@ -52,8 +52,6 @@ private:
 
     
     JointAngles solveIK(double x, double y, double z)                           const;
-    //siendo s la distancia horizontal y d la vertical
-    JointAngles solveOneBranch(double q1, double s, double d, bool knee_out)    const;
     bool        isWithinReach(double s, double d)                               const;
     bool        isWithinJointLimits(const JointAngles& angles)                  const;
 

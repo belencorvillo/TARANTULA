@@ -22,7 +22,7 @@ public:
     void enableAllLegs();   
     void disableAllLegs();  
 
-    void moveLeg(int leg_id, double x, double y, double z); //para cuando haga la cinemática inversa
+    void moveLeg(int leg_id, double x, double y, double z); 
     void moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness);
 
     void setBodyPose(double dx, double dy, double dz, double roll, double pitch);
