@@ -51,6 +51,7 @@ bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiff
     JointAngles angles = solveIK(x, y, z);
     if (!angles.valid) return false;
     applyAngles(angles, stiffness_q1, stiffness_q2, stiffness_q3);
+    last_command_was_ik_.store(true, std::memory_order_relaxed);
     return true;
 }
 
@@ -60,16 +61,22 @@ void Leg::moveJoint(int joint, float pos_deg, int stiffness)
     MotorController& m = motor_[joint - 1];
 
     m.setTarget(pos_deg * static_cast<float>(M_PI / 180.0), stiffness);
+    last_command_was_ik_.store(false, std::memory_order_relaxed);
 }
 
 void Leg::waitUntilSettled(const std::atomic<bool>& sequence_active,
                            float tolerance_deg) const
 {
+    float active_tolerance = tolerance_deg;
+    if (last_command_was_ik_.load(std::memory_order_relaxed)) {
+        active_tolerance = std::min(tolerance_deg, 5.0f);
+    }
+
     bool all_settled = false;
     while (!all_settled && sequence_active.load()) {
         all_settled = true;
         for (int j = 0; j < 3; ++j) {
-            if (!motor_[j].isSettled(tolerance_deg)) {
+            if (!motor_[j].isSettled(active_tolerance)) {
                 all_settled = false;
                 break;
             }

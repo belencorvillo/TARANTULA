@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <utility>
+#include <atomic>
 #include "MotorController.h"
 
 #ifndef M_PI
@@ -61,5 +62,5 @@ private:
     //aplica los ángulos a los motores
     void applyAngles(const JointAngles& angles, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4);
 
-
+    std::atomic<bool> last_command_was_ik_{false};
 };
