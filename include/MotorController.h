@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include <cmath>
+#include <chrono>
 #include "SteadyWinMotor.h"
 #include <vector>
 #include "WaveshareInterface.h"
@@ -32,19 +33,21 @@ public:
 
     std::atomic<float> current_traj_pos{ 0.0f };
     std::atomic<float> current_traj_vel{ 0.0f };
-    std::atomic<float> traj_max_vel{ 8.0f };    
-    std::atomic<float> traj_max_accel{ 20.0f };  
+    std::atomic<float> traj_max_vel{ 3.0f };      // Límite seguro (físico del motor es 5.5 rad/s)
+    std::atomic<float> traj_max_accel{ 5.0f };   // Aceleración suave y segura para proteger engranajes
     
     std::atomic<bool> active{ false };
     std::atomic<bool> is_trap_traj{ false };
     std::atomic<bool> motor_online{ false };
     std::atomic<uint64_t> last_msg_time_ms{ 0 };    // Tiempo del último mensaje recibido
-
+    std::atomic<int64_t> last_tick_time; // Tiempo del último tick de control
     
     std::atomic<float> last_known_pos{ 0.0f };
     std::atomic<float> last_known_vel{ 0.0f };
     std::atomic<float> last_known_torque{ 0.0f };
     std::atomic<float> pos_offset{ 0.0f }; //podríamos ponerlo como no atomic porque realmente solo se calcula una vez, pero me da miedo que si le doy varias veces al botón de encender se me raye
+    std::atomic<float> filtered_pos;
+
 
     MotorController(uint8_t id, bool reversed = false);
     ~MotorController();
@@ -59,7 +62,7 @@ public:
 
    
     bool check_timeout(int64_t now_ms, int64_t timeout_ms = 2000);
-    MW_MIT_CTRL step_trajectory();
+    MW_MIT_CTRL step_trajectory(float dt);
     
     void enableSafely(int stiffness);
     void applyStiffness(int stiffness);

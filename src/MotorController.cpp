@@ -103,7 +103,11 @@ MW_MIT_CTRL MotorController::step_trajectory() {
     float target_p  = target_pos.load(std::memory_order_relaxed);
     float max_v     = traj_max_vel.load(std::memory_order_relaxed);
     float max_a     = traj_max_accel.load(std::memory_order_relaxed);
-    float dt        = (float)SEND_FREQUENCY;
+   
+    int64_t now = now_ms;
+    int64_t Last = last_tick_time_ms.load(std::memory_order_relaxed);
+    float dt = (last == 0) ? (float)SEND_FREQUENCY : std::clamp((float)(now - last)*0.001f,0.001f,0.05f);
+    last_tick_time_ms.store(now, std::memory_order_relaxed);
 
     float error = target_p - current_p;
     float dir   = (error > 0.0f) ? 1.0f : -1.0f;
@@ -130,7 +134,12 @@ MW_MIT_CTRL MotorController::step_trajectory() {
 
     MW_MIT_CTRL mit;
     float abs_p  = current_p + pos_offset.load(std::memory_order_relaxed);
-    mit.pos      = logic_to_phys(abs_p);
+
+    constexpr float alpha = 0.8f;
+    float filtered_pos = alpha * filtered_pos.load(std::memory_order_relaxed) + (1 - alpha) * abs_p;
+
+
+    mit.pos      = logic_to_phys(filtered_pos);
     mit.vel      = convert_dir(current_v);
     mit.kp       = target_kp.load(std::memory_order_relaxed);
     mit.kd       = target_kd.load(std::memory_order_relaxed);
@@ -184,10 +193,10 @@ std::pair<float, float> MotorController::stiffnessToGains(int stiffness)
     switch (stiffness) {
     case 1:  return { 5.0f,  0.1f };
     case 2:  return { 10.0f, 0.3f };
-    case 3:  return { 20.0f, 0.5f };
-    case 4:  return { 35.0f, 1.0f };
-    case 5:  return { 50.0f, 1.5f };
-    default: return { 20.0f, 0.5f };
+    case 3:  return { 15.0f, 0.5f };
+    case 4:  return { 25.0f, 1.2f };
+    case 5:  return { 40.0f, 2.0f };
+    default: return { 20.0f, 3.0f };
     }
 }
 

@@ -6,7 +6,7 @@
 //BAUDRATE SERIAL (USB): 2000000 BPS
 
 namespace Config {
-    // 1. CONFIGURACI”N DEL PUERTO SERIE (WAVESHARE)
+    // 1. CONFIGURACI√ìN DEL PUERTO SERIE (WAVESHARE)
     const std::string SERIAL_PORT = "\\\\.\\COM3"; // Formato seguro para Windows
     const int SERIAL_BAUDRATE = 2000000;
    
@@ -21,7 +21,7 @@ namespace Config {
     const uint8_t CAN_BAUD_500K = 0x03;
     
 
-    // 3. LÕMITES FÕSICOS DEL MOTOR (FIRMWARE)
+    // 3. L√çMITES F√çSICOS DEL MOTOR (FIRMWARE)
     const float P_MIN = -12.5f;
     const float P_MAX = 12.5f;
     const float V_MIN = -65.0f;
@@ -33,7 +33,7 @@ namespace Config {
     const float KD_MIN = 0.0f;
     const float KD_MAX = 5.0f;
 
-    // 4. LÕMITES DE SEGURIDAD (SOFTWARE)
+    // 4. L√çMITES DE SEGURIDAD (SOFTWARE)
     const float SAFE_VEL_LIMIT = 30.0f;
     const float SAFE_CURRENT_LIMIT = 10.0f;
 }

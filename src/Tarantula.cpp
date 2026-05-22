@@ -107,7 +107,7 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
     }
 
     for (int i = 0; i < 4; ++i) {
-        Eigen::Vector3d local_target = computeFootTargetForLeg(i, dx, dy, dz, roll, pitch);
+        Eigen::Vector3d local_target = computeFootTargetForLeg(i, dx, dy, dz, roll, pitch); //IMPLEMENTARLO EN LA PATA!!!!
         legs_[i]->goToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
     }
 }
@@ -119,6 +119,12 @@ void Tarantula::resetBodyPoseReference()
 
 void Tarantula::captureFeetPositions()
 {
+
+    // LLAMAR A LAS PATAS (CINEMATICA DIRECTA) QUE ME DA SU PUNTO P RESPECTO SU COORDENADA PROPIA,
+    // ESO LO MULTIPLICO RESPECTO A LA MATRIZ DE TRASLACION CUERPO PATA I
+
+
+
     // Usamos los ángulos de la posición de inicio de los comandos de cinemática inversa
     double ref_q1 = 0.0;
     double ref_q2 = 24.0 * M_PI / 180.0;
@@ -170,6 +176,9 @@ Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy
     // Posición de pie inicial respecto del cuerpo
     Eigen::Vector3d p_global = initial_feet_positions_[idx];
 
+
+    //QUE ESTO DE LA MATRIZ DE ROTACION Y TRASLACIÓN ME LO HAGA EIGEN
+
     // Rotación y traslación del cuerpo
     // R_body = R_y(roll) * R_x(pitch)
     double cr = std::cos(roll);
@@ -188,14 +197,16 @@ Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy
     // P_body = R_body^T * (P_global - T)
     Eigen::Vector3d p_body = R_body.transpose() * (p_global - T);
 
-    // Cambiar de sistemas de coordenadas del cuerpo a sistemas de coordenadas de la pata 
+    // Cambiar de sistemas de coordenadas del cuerpo a sistemas de coordenadas de la pata
+
+    //Poner theta como un parámetro de la pata que se inicia en la creación!!
     double theta = 0.0;
     if      (idx == 0) theta = -M_PI / 4.0;
     else if (idx == 1) theta =  M_PI / 4.0;
     else if (idx == 2) theta =  3.0 * M_PI / 4.0;
     else if (idx == 3) theta = -3.0 * M_PI / 4.0;
 
-    double R_hip = 0.15; 
+    double R_hip = 0.15; //radio del cuerpo PONER COMO ATRIBUTOS CONSTANTES LAS MEDIDAS!!!!
     double x_off = R_hip * std::cos(theta);
     double y_off = R_hip * std::sin(theta);
 
