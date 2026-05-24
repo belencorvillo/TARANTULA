@@ -41,6 +41,7 @@ private slots:
     void on_sliderBodyZ_valueChanged(int value);
     void on_sliderBodyRoll_valueChanged(int value);
     void on_sliderBodyPitch_valueChanged(int value);
+    void on_sliderBodyYaw_valueChanged(int value);
     void on_btnResetPose_clicked();
 
 private:

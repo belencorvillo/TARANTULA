@@ -3,7 +3,11 @@
 #include <vector>
 #include <utility>
 #include <cstdint>
-
+#include <queue>
+#include <mutex>
+#include <thread>
+#include <atomic>
+#include <condition_variable>
 
 class WaveshareInterface {
 private:
@@ -13,8 +17,16 @@ private:
     bool is_connected;
     std::vector<uint8_t> rx_buffer; // Buffer persistente para sincronización
 
+    // Cola de envío asíncrona para espaciar tramas a 1 ms en hardware sin bloquear el hilo de control
+    std::queue<std::vector<uint8_t>> tx_queue;
+    std::mutex tx_mutex;
+    std::condition_variable tx_cv;
+    std::thread tx_thread;
+    std::atomic<bool> tx_running;
+
     uint8_t calculate_checksum(const std::vector<uint8_t>& payload);
     void configure_adapter_500k();
+    void txLoop();
 
 public:
     WaveshareInterface(std::string portStr = "COM3", int baudRate = 2000000);

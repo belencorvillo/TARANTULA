@@ -25,7 +25,7 @@ public:
     void moveLeg(int leg_id, double x, double y, double z); 
     void moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness);
 
-    void setBodyPose(double dx, double dy, double dz, double roll, double pitch);
+    void setBodyPose(double dx, double dy, double dz, double roll, double pitch, double yaw = 0.0);
     void resetBodyPoseReference();
 
     void standUp();
@@ -41,7 +41,6 @@ private:
     WaveshareInterface& comm_;
     std::array<Leg*, 4> legs_;  
     bool feet_captured_{ false };
-    std::array<Eigen::Vector3d, 4> initial_feet_positions_;
     
     std::atomic<bool> running_{ false };
     std::thread       rx_thread_;
@@ -56,8 +55,6 @@ private:
 
     // Captura las posiciones actuales de los pies mediante FK
     void captureFeetPositions();
-    Eigen::Vector3d computeFootTargetForLeg(int leg_idx, double dx, double dy, double dz,
-                                         double roll, double pitch) const;
 
     void runStandUpSequence();
     void runSitDownSequence();

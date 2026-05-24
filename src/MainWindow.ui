@@ -281,6 +281,36 @@
               </property>
              </widget>
             </item>
+            <item>
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>Yaw</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSlider" name="sliderBodyYaw">
+              <property name="minimum">
+               <number>-25</number>
+              </property>
+              <property name="maximum">
+               <number>25</number>
+              </property>
+              <property name="value">
+               <number>0</number>
+              </property>
+              <property name="orientation">
+               <enum>Qt::Orientation::Horizontal</enum>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblBodyYaw">
+              <property name="text">
+               <string>0°</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>

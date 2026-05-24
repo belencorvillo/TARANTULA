@@ -31,9 +31,10 @@ Tarantula::~Tarantula()
 
 void Tarantula::createLegs()
 {
-    for (int n = 1; n <= 4; ++n) {
-        legs_[n - 1] = new Leg(n);
-    }
+    legs_[0] = new Leg(1, -M_PI / 4.0);
+    legs_[1] = new Leg(2,  M_PI / 4.0);
+    legs_[2] = new Leg(3,  3.0 * M_PI / 4.0);
+    legs_[3] = new Leg(4, -3.0 * M_PI / 4.0);
 }
 
 void Tarantula::start()
@@ -92,7 +93,7 @@ void Tarantula::moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness
 }
 
 void Tarantula::setBodyPose(double dx, double dy, double dz,
-                            double roll, double pitch)
+                            double roll, double pitch, double yaw)
 {
     if (!feet_captured_) {
         captureFeetPositions();
@@ -107,7 +108,7 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
     }
 
     for (int i = 0; i < 4; ++i) {
-        Eigen::Vector3d local_target = computeFootTargetForLeg(i, dx, dy, dz, roll, pitch); //IMPLEMENTARLO EN LA PATA!!!!
+        Eigen::Vector3d local_target = legs_[i]->computeFootTarget(dx, dy, dz, roll, pitch, yaw);
         legs_[i]->goToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
     }
 }
@@ -119,108 +120,10 @@ void Tarantula::resetBodyPoseReference()
 
 void Tarantula::captureFeetPositions()
 {
-
-    // LLAMAR A LAS PATAS (CINEMATICA DIRECTA) QUE ME DA SU PUNTO P RESPECTO SU COORDENADA PROPIA,
-    // ESO LO MULTIPLICO RESPECTO A LA MATRIZ DE TRASLACION CUERPO PATA I
-
-
-
-    // Usamos los ángulos de la posición de inicio de los comandos de cinemática inversa
-    double ref_q1 = 0.0;
-    double ref_q2 = 24.0 * M_PI / 180.0;
-    double ref_q3 = -100.0 * M_PI / 180.0;
-
-    //Longitudes entre los motores de las patas
-    double L1 = 0.08;
-    double L2 = 0.19;
-    double L3 = 0.225;
-
-    // Posición del extremo de la pata respecto su referencia local (eje q1)
-    double r = L1 + L2 * std::cos(ref_q2) + L3 * std::cos(ref_q2 + ref_q3);
-    double x_local = r * std::cos(ref_q1);
-    double y_local = r * std::sin(ref_q1);
-    double z_local = L2 * std::sin(ref_q2) + L3 * std::sin(ref_q2 + ref_q3);
-
-    Eigen::Vector3d p_local(x_local, y_local, z_local);
-
     for (int i = 0; i < 4; ++i) {
-        //Las patas están a 90 grados unas de otras
-        double theta = 0.0;
-        if      (i == 0) theta = -M_PI / 4.0;
-        else if (i == 1) theta =  M_PI / 4.0;
-        else if (i == 2) theta =  3.0 * M_PI / 4.0;
-        else if (i == 3) theta = -3.0 * M_PI / 4.0;
-
-        double R_hip = 0.15; // 15cm radius
-        double x_off = R_hip * std::cos(theta);
-        double y_off = R_hip * std::sin(theta);
-
-        double cos_t = std::cos(theta);
-        double sin_t = std::sin(theta);
-
-        //Coordenadas del extremo de la pata en el sistema de referencia del cuerpo (Ecuaciones de rotación y traslación)
-        double x_foot_body = p_local.x() * cos_t - p_local.y() * sin_t + x_off;
-        double y_foot_body = p_local.x() * sin_t + p_local.y() * cos_t + y_off;
-        double z_foot_body = p_local.z();
-
-        initial_feet_positions_[i] = Eigen::Vector3d(x_foot_body, y_foot_body, z_foot_body);
+        legs_[i]->captureInitialFootPosition();
     }
     feet_captured_ = true;
-}
-
-Eigen::Vector3d Tarantula::computeFootTargetForLeg(int idx, double dx, double dy, double dz,
-                                         double roll, double pitch) const
-{
-    if (!feet_captured_) return Eigen::Vector3d::Zero();
-
-    // Posición de pie inicial respecto del cuerpo
-    Eigen::Vector3d p_global = initial_feet_positions_[idx];
-
-
-    //QUE ESTO DE LA MATRIZ DE ROTACION Y TRASLACIÓN ME LO HAGA EIGEN
-
-    // Rotación y traslación del cuerpo
-    // R_body = R_y(roll) * R_x(pitch)
-    double cr = std::cos(roll);
-    double sr = std::sin(roll);
-    double cp = std::cos(pitch);
-    double sp = std::sin(pitch);
-
-    Eigen::Matrix3d R_body;
-    R_body << cr,  sr*sp,  sr*cp,
-              0.0,    cp,    -sp,
-             -sr,  cr*sp,  cr*cp;
-
-    Eigen::Vector3d T(dx, dy, dz);
-
-    //Siendo P_body dónde se encuentra el pie respecto al nuevo cuerpo movido
-    // P_body = R_body^T * (P_global - T)
-    Eigen::Vector3d p_body = R_body.transpose() * (p_global - T);
-
-    // Cambiar de sistemas de coordenadas del cuerpo a sistemas de coordenadas de la pata
-
-    //Poner theta como un parámetro de la pata que se inicia en la creación!!
-    double theta = 0.0;
-    if      (idx == 0) theta = -M_PI / 4.0;
-    else if (idx == 1) theta =  M_PI / 4.0;
-    else if (idx == 2) theta =  3.0 * M_PI / 4.0;
-    else if (idx == 3) theta = -3.0 * M_PI / 4.0;
-
-    double R_hip = 0.15; //radio del cuerpo PONER COMO ATRIBUTOS CONSTANTES LAS MEDIDAS!!!!
-    double x_off = R_hip * std::cos(theta);
-    double y_off = R_hip * std::sin(theta);
-
-    
-    double x_rel = p_body.x() - x_off;
-    double y_rel = p_body.y() - y_off;
-    double z_rel = p_body.z();
-
-    // Rotación y traslación
-    double x_local = x_rel * std::cos(theta) + y_rel * std::sin(theta);
-    double y_local = -x_rel * std::sin(theta) + y_rel * std::cos(theta);
-    double z_local = z_rel;
-
-    return Eigen::Vector3d(x_local, y_local, z_local);
 }
 
 
@@ -339,7 +242,7 @@ void Tarantula::controlLoop()
             tickAllLegs(cycle_count);
             last_tick = std::chrono::steady_clock::now();
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1)); //ver si la puedo bajar a 3 ms o algo así
     }
 }
 

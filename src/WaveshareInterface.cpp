@@ -5,7 +5,7 @@
 #include <chrono>
 
 WaveshareInterface::WaveshareInterface(std::string portStr, int baudRate)
-    : port(portStr), baud(baudRate), is_connected(false) {
+    : port(portStr), baud(baudRate), is_connected(false), tx_running(false) {
     serial = new SimpleSerial(port, baud);
 }
 
@@ -19,6 +19,11 @@ bool WaveshareInterface::connect() {
     if (serial->connect()) {
         is_connected = true;
         configure_adapter_500k();
+
+        // Iniciar hilo de transmisión asíncrono
+        tx_running = true;
+        tx_thread = std::thread(&WaveshareInterface::txLoop, this);
+
         return true;
     }
     std::cout << "❌ Error critico de conexion.\n";
@@ -27,6 +32,17 @@ bool WaveshareInterface::connect() {
 
 void WaveshareInterface::close() {
     if (is_connected) {
+        // Detener hilo de transmisión asíncrono
+        tx_running = false;
+        tx_cv.notify_all();
+        if (tx_thread.joinable()) {
+            tx_thread.join();
+        }
+
+        // Vaciar la cola restante
+        std::queue<std::vector<uint8_t>> empty_q;
+        std::swap(tx_queue, empty_q);
+
         serial->close();
         is_connected = false;
         std::cout << "🔌 Puerto cerrado.\n";
@@ -86,7 +102,12 @@ void WaveshareInterface::send_can_frame(uint32_t can_id, const std::vector<uint8
     std::vector<uint8_t> payload(frame.begin() + 2, frame.begin() + 19);
     frame[19] = calculate_checksum(payload);
 
-    serial->writeBytes(frame);
+    // Encolar de forma asíncrona para que el hilo de control no se bloquee por el sleep
+    {
+        std::lock_guard<std::mutex> lock(tx_mutex);
+        tx_queue.push(std::move(frame));
+    }
+    tx_cv.notify_one();
 }
 
 bool WaveshareInterface::receive_can_frame(uint32_t& can_id, std::vector<uint8_t>& data) {
@@ -138,4 +159,41 @@ bool WaveshareInterface::receive_can_frame(uint32_t& can_id, std::vector<uint8_t
     }
 
     return false;
+}
+
+void WaveshareInterface::txLoop() {
+    while (tx_running.load(std::memory_order_relaxed)) {
+        std::vector<uint8_t> frame;
+        {
+            std::unique_lock<std::mutex> lock(tx_mutex);
+            tx_cv.wait(lock, [this]() {
+                return !tx_queue.empty() || !tx_running.load(std::memory_order_relaxed);
+            });
+            
+            if (!tx_running.load(std::memory_order_relaxed) && tx_queue.empty()) {
+                break;
+            }
+            
+            frame = std::move(tx_queue.front());
+            tx_queue.pop();
+        }
+
+        if (is_connected) {
+            serial->writeBytes(frame);
+        }
+
+        // Pacing físico preciso para el adaptador USB-CAN.
+        // Usamos un spin-wait de alta precisión para evitar las limitaciones de granularidad
+        // del planificador de Windows (que por defecto es de 15.6 ms).
+        // 1000 microsegundos (1 ms) es el espaciado obligatorio requerido por los motores SteadyWin y el hardware.
+        auto start = std::chrono::high_resolution_clock::now();
+        while (tx_running.load(std::memory_order_relaxed)) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now() - start).count();
+            if (elapsed >= 1000) {
+                break;
+            }
+            std::this_thread::yield();
+        }
+    }
 }

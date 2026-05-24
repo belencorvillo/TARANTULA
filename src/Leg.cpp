@@ -5,19 +5,30 @@
 #include <algorithm>
 
 
-Leg::Leg(int leg_id)
+Leg::Leg(int leg_id, double theta)
     : leg_id_(leg_id)
+    , theta_(theta)
+    , leg_to_body_(Eigen::Isometry3d::Identity())
+    , initial_foot_position_(Eigen::Vector3d::Zero())
     , motor_{
         {static_cast<uint8_t>(leg_id * 10 + 1), false},
         {static_cast<uint8_t>(leg_id * 10 + 2), true},  // Motor X2 (fémur) invertido mecánicamente
         {static_cast<uint8_t>(leg_id * 10 + 3), false}
       }
 {
+    double x_off = R_HIP * std::cos(theta_);
+    double y_off = R_HIP * std::sin(theta_);
+    
+    // Matriz de transformación de pata a cuerpo:
+    // Primero rotamos sobre el eje Z por theta, y luego trasladamos por (x_off, y_off, 0)
+    leg_to_body_ = Eigen::Translation3d(x_off, y_off, 0.0) * Eigen::AngleAxisd(theta_, Eigen::Vector3d::UnitZ());
 }  
 
 Leg::~Leg()
 {
 }
+
+
 
 
 void Leg::enable()
@@ -45,10 +56,10 @@ bool Leg::isEnabled() const
     return false;
 }
 
-bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3)
+bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3, bool knee_up)
 {
     //ESTO LO USAREMOS CUANDO TENGA LA CINEMÁTICA INVERSA
-    JointAngles angles = solveIK(x, y, z);
+    JointAngles angles = solveIK(x, y, z, knee_up);
     if (!angles.valid) return false;
     applyAngles(angles, stiffness_q1, stiffness_q2, stiffness_q3);
     last_command_was_ik_.store(true, std::memory_order_relaxed);
@@ -112,16 +123,25 @@ Eigen::Vector3d Leg::getCurrentFootPosition() const
     return forwardKinematics(q1, q2, q3);
 }
 
-
-JointAngles Leg::solveIK(double x, double y, double z) const
+void Leg::captureInitialFootPosition()
 {
+    Eigen::Vector3d p_local = getCurrentFootPosition();
+    initial_foot_position_ = leg_to_body_ * p_local;
+}
 
-    // Longitudes entre ejes de los motores:
-    double L1 = 0.08; //Coxa (q1 y q2)
-    double L2 = 0.19;  // Femur (q2 y q3)
-    double L3 = 0.225; // Tibia (q3 y efector final)
+Eigen::Vector3d Leg::computeFootTarget(double dx, double dy, double dz, double roll, double pitch, double yaw) const
+{
+    Eigen::Matrix3d R_body = (Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ())
+                            * Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitY())
+                            * Eigen::AngleAxisd(pitch, Eigen::Vector3d::UnitX())).toRotationMatrix();
+    Eigen::Isometry3d body_transform = Eigen::Translation3d(dx, dy, dz) * Eigen::Isometry3d(R_body);
+    Eigen::Vector3d p_body = body_transform.inverse() * initial_foot_position_;
+    return leg_to_body_.inverse() * p_body;
+}
 
 
+JointAngles Leg::solveIK(double x, double y, double z, bool knee_up) const
+{
     JointAngles angles;
     angles.valid = false;
 
@@ -144,13 +164,16 @@ JointAngles Leg::solveIK(double x, double y, double z) const
 
     double D2 = s_femur * s_femur + d * d; //ec auxiliar
 
-    
     double cosq3 = (D2 - L2 * L2 - L3 * L3) / (2.0 * L2 * L3); //ec 145, pág 45
     cosq3 = std::max(-1.0, std::min(1.0, cosq3)); // Clamp de seguridad indispensable ????
     
     double q3 = std::acos(cosq3);
-    // Como queremos que esté en postura arácnida (rodilla arriba), aplicamos el ángulo negativo:
-    angles.q3 = -q3;
+    // Para rodilla arriba es negativo, para rodilla abajo es positivo
+    if (knee_up) {
+        angles.q3 = -q3;
+    } else {
+        angles.q3 = q3;
+    }
 
     // Obtenemos el ángulo q2 por la ley de los cosenos:
     double alpha1 = std::atan2(d, s_femur);
@@ -158,12 +181,16 @@ JointAngles Leg::solveIK(double x, double y, double z) const
     cosAlpha2 = std::max(-1.0, std::min(1.0, cosAlpha2));
     double alpha2 = std::acos(cosAlpha2);
 
-    // Para posición con rodilla arriba:
-    angles.q2 = alpha1 + alpha2;
+    // Para rodilla arriba sumamos alpha2, para rodilla abajo restamos alpha2
+    if (knee_up) {
+        angles.q2 = alpha1 + alpha2;
+    } else {
+        angles.q2 = alpha1 - alpha2;
+    }
     angles.q1 = q1;
     
     // Mirar si es viable:
-    if (isWithinJointLimits(angles)) {
+    if (isWithinJointLimits(angles, knee_up)) {
         angles.valid = true;
     }
 
@@ -172,15 +199,16 @@ JointAngles Leg::solveIK(double x, double y, double z) const
 
 
 
+
 bool Leg::isWithinReach(double s, double d) const
 {
     double D = std::sqrt(s * s + d * d);
-    // Max reach = 19cm + 22.5cm = 41.5cm = 0.415m
-    // Min reach = |19cm - 22.5cm| = 3.5cm = 0.035m
-    return (D >= 0.035 && D <= 0.415);
+    double max_reach = L2 + L3;
+    double min_reach = std::abs(L2 - L3);
+    return (D >= min_reach && D <= max_reach);
 }
 
-bool Leg::isWithinJointLimits(const JointAngles& a) const
+bool Leg::isWithinJointLimits(const JointAngles& a, bool knee_up) const
 {
     double q1_deg = a.q1 * 180.0 / M_PI;
     double q2_deg = a.q2 * 180.0 / M_PI;
@@ -189,7 +217,12 @@ bool Leg::isWithinJointLimits(const JointAngles& a) const
     // límites
     if (q1_deg < -45.0 || q1_deg > 45.0) return false;
     if (q2_deg < -60.0 || q2_deg > 90.0) return false;
-    if (q3_deg < -150.0 || q3_deg > 0.0) return false; //para que siempre sea "rodilla arriba"
+    
+    if (knee_up) {
+        if (q3_deg < -150.0 || q3_deg > 0.0) return false; // rodilla arriba
+    } else {
+        if (q3_deg < 0.0 || q3_deg > 150.0) return false;  // rodilla abajo
+    }
 
     return true;
 }
@@ -197,10 +230,6 @@ bool Leg::isWithinJointLimits(const JointAngles& a) const
 
 Eigen::Vector3d Leg::forwardKinematics(double q1, double q2, double q3) const
 {
-    double L1 = 0.08;
-    double L2 = 0.19;
-    double L3 = 0.225;
-
     // Fórmulas de cinemática directa (pg documentación de Guille):
     double r = L1 + L2 * std::cos(q2) + L3 * std::cos(q2 + q3); //ec 120, pág 40 (parámetro auxiliar)
     double x = r * std::cos(q1); //ec 119, pag 40
@@ -209,6 +238,7 @@ Eigen::Vector3d Leg::forwardKinematics(double q1, double q2, double q3) const
 
     return Eigen::Vector3d(x, y, z);
 }
+
 
 
 void Leg::applyAngles(const JointAngles& angles, int stiffness_q1, int stiffness_q2, int stiffness_q3)

@@ -202,6 +202,7 @@ void MainWindow::on_sliderBodyY_valueChanged(int)     { sendCurrentBodyPose(); }
 void MainWindow::on_sliderBodyZ_valueChanged(int)     { sendCurrentBodyPose(); }
 void MainWindow::on_sliderBodyRoll_valueChanged(int)  { sendCurrentBodyPose(); }
 void MainWindow::on_sliderBodyPitch_valueChanged(int) { sendCurrentBodyPose(); }
+void MainWindow::on_sliderBodyYaw_valueChanged(int)   { sendCurrentBodyPose(); }
 
 void MainWindow::sendCurrentBodyPose()
 {
@@ -213,20 +214,23 @@ void MainWindow::sendCurrentBodyPose()
     int valZ = ui->sliderBodyZ->value();
     int valRoll = ui->sliderBodyRoll->value();
     int valPitch = ui->sliderBodyPitch->value();
+    int valYaw = ui->sliderBodyYaw->value();
 
     ui->lblBodyX->setText(QString("%1 mm").arg(valX));
     ui->lblBodyY->setText(QString("%1 mm").arg(valY));
     ui->lblBodyZ->setText(QString("%1 mm").arg(valZ));
     ui->lblBodyRoll->setText(QString("%1°").arg(valRoll));
     ui->lblBodyPitch->setText(QString("%1°").arg(valPitch));
+    ui->lblBodyYaw->setText(QString("%1°").arg(valYaw));
 
     double dx    = valX * SLIDER_XYZ_SCALE;
     double dy    = valY * SLIDER_XYZ_SCALE;
     double dz    = valZ * SLIDER_XYZ_SCALE;
     double roll  = valRoll * SLIDER_ANGLE_SCALE;
     double pitch = valPitch * SLIDER_ANGLE_SCALE;
+    double yaw   = valYaw * SLIDER_ANGLE_SCALE;
 
-    robot_->setBodyPose(dx, dy, dz, roll, pitch);
+    robot_->setBodyPose(dx, dy, dz, roll, pitch, yaw);
 }
 
 void MainWindow::on_btnResetPose_clicked()
@@ -236,25 +240,35 @@ void MainWindow::on_btnResetPose_clicked()
     ui->sliderBodyZ->blockSignals(true);
     ui->sliderBodyRoll->blockSignals(true);
     ui->sliderBodyPitch->blockSignals(true);
+    ui->sliderBodyYaw->blockSignals(true);
 
     ui->sliderBodyX->setValue(0);
     ui->sliderBodyY->setValue(0);
     ui->sliderBodyZ->setValue(0);
     ui->sliderBodyRoll->setValue(0);
     ui->sliderBodyPitch->setValue(0);
+    ui->sliderBodyYaw->setValue(0);
 
     ui->sliderBodyX->blockSignals(false);
     ui->sliderBodyY->blockSignals(false);
     ui->sliderBodyZ->blockSignals(false);
     ui->sliderBodyRoll->blockSignals(false);
     ui->sliderBodyPitch->blockSignals(false);
+    ui->sliderBodyYaw->blockSignals(false);
 
     ui->lblBodyX->setText("0 mm");
     ui->lblBodyY->setText("0 mm");
     ui->lblBodyZ->setText("0 mm");
     ui->lblBodyRoll->setText("0°");
     ui->lblBodyPitch->setText("0°");
+    ui->lblBodyYaw->setText("0°");
 
-    robot_->resetBodyPoseReference();
-    robot_->setBodyPose(0.0, 0.0, 0.0, 0.0, 0.0);
+    // Mover articulaciones directamente a la pose de pie por defecto (q1=0, q2=24, q3=-100)
+    for (int i = 1; i <= 4; ++i) {
+        robot_->moveLegJoint(i, 1, 0.0f, 5);
+        robot_->moveLegJoint(i, 2, 20.0f, 5);
+        robot_->moveLegJoint(i, 3, -100.0f, 5);
+    }
+
+    robot_->resetBodyPoseReference(); // Permitir capturar de nuevo desde la postura recta limpia
 }
