@@ -29,7 +29,7 @@ public:
 
     std::atomic<float> current_traj_pos{ 0.0f };
     std::atomic<float> current_traj_vel{ 0.0f };
-    std::atomic<float> traj_max_vel{ 2.0f };
+    std::atomic<float> traj_max_vel{ 3.0f };
     std::atomic<float> traj_max_accel{ 5.0f };
 
     std::atomic<bool> active{ false };
