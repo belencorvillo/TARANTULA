@@ -100,12 +100,6 @@ void Tarantula::setBodyPose(double dx, double dy, double dz,
     }
 
     int s1 = 3, s2 = 4, s3 = 4; //rigidez predeterminada
-    //si movemos el eje x o y ponemos todos los motores con máxima rigidez para que no deslice
-    if (std::abs(dx) > 1e-5 || std::abs(dy) > 1e-5) {
-        s1 = 5;
-        s2 = 5;
-        s3 = 5;
-    }
 
     for (int i = 0; i < 4; ++i) {
         Eigen::Vector3d local_target = legs_[i]->computeFootTarget(dx, dy, dz, roll, pitch, yaw);
@@ -149,11 +143,24 @@ void Tarantula::abortSequence()
 
 void Tarantula::runStandUpSequence()
 {
+    feet_captured_ = false;
+
     for (Leg* leg : legs_) {
         leg->moveJoint(1, 0.0f, 3);
         leg->moveJoint(2, 24.0f, 4);
         leg->moveJoint(3, -100.0f, 4);
     }
+
+    // Esperar de forma síncrona en este hilo secundario hasta que se asienten todas las patas
+    for (Leg* leg : legs_) {
+        leg->waitUntilSettled(sequence_active_);
+    }
+
+    // Capturar la pose de referencia de los pies únicamente si la secuencia no fue abortada
+    if (sequence_active_.load()) {
+        captureFeetPositions();
+    }
+
     sequence_active_.store(false);
 }
 
@@ -242,7 +249,7 @@ void Tarantula::controlLoop()
             tickAllLegs(cycle_count);
             last_tick = std::chrono::steady_clock::now();
         }
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1)); //ver si la puedo bajar a 3 ms o algo así
+        std::this_thread::sleep_for(std::chrono::milliseconds(3)); // Duerme 1 ms (gracias a la resolución forzada a 1 ms por timeBeginPeriod), evitando el 100% de uso de CPU
     }
 }
 

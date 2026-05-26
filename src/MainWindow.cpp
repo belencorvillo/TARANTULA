@@ -263,12 +263,5 @@ void MainWindow::on_btnResetPose_clicked()
     ui->lblBodyPitch->setText("0°");
     ui->lblBodyYaw->setText("0°");
 
-    // Mover articulaciones directamente a la pose de pie por defecto (q1=0, q2=24, q3=-100)
-    for (int i = 1; i <= 4; ++i) {
-        robot_->moveLegJoint(i, 1, 0.0f, 5);
-        robot_->moveLegJoint(i, 2, 20.0f, 5);
-        robot_->moveLegJoint(i, 3, -100.0f, 5);
-    }
-
-    robot_->resetBodyPoseReference(); // Permitir capturar de nuevo desde la postura recta limpia
+    robot_->standUp();
 }

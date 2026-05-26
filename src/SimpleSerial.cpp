@@ -1,4 +1,4 @@
-﻿#include "SimpleSerial.h"
+#include "SimpleSerial.h"
 #include <iostream>
 
 SimpleSerial::SimpleSerial(std::string portName, int baud)
@@ -25,6 +25,14 @@ bool SimpleSerial::connect() {
     dcbSerialParams.ByteSize = 8; // paquetes de 8 bits
     dcbSerialParams.StopBits = ONESTOPBIT; //1 bit de parada al final
     dcbSerialParams.Parity = NOPARITY; //sin bit de comprobación 
+
+    // Deshabilitar control de flujo explícitamente para evitar bloqueos del driver de Windows
+    dcbSerialParams.fOutxCtsFlow = FALSE;
+    dcbSerialParams.fOutxDsrFlow = FALSE;
+    dcbSerialParams.fDtrControl = DTR_CONTROL_DISABLE;
+    dcbSerialParams.fRtsControl = RTS_CONTROL_DISABLE;
+    dcbSerialParams.fOutX = FALSE;
+    dcbSerialParams.fInX = FALSE;
 
     if (!SetCommState(hSerial, &dcbSerialParams)) { close(); return false; }
 

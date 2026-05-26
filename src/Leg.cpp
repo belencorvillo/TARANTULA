@@ -125,7 +125,13 @@ Eigen::Vector3d Leg::getCurrentFootPosition() const
 
 void Leg::captureInitialFootPosition()
 {
-    Eigen::Vector3d p_local = getCurrentFootPosition();
+    // Usamos los ángulos ideales de diseño (q1=0.0, q2=24.0°, q3=-100.0°) de la pose de pie
+    // para asegurar que las referencias iniciales de los pies sean perfectamente simétricas y libres de ruido.
+    double q1_ideal = 0.0;
+    double q2_ideal = 24.0 * M_PI / 180.0;
+    double q3_ideal = -100.0 * M_PI / 180.0;
+    
+    Eigen::Vector3d p_local = forwardKinematics(q1_ideal, q2_ideal, q3_ideal);
     initial_foot_position_ = leg_to_body_ * p_local;
 }
 

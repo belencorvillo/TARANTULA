@@ -34,6 +34,9 @@ add_executable(TARANTULA_UI
 )
 
 target_link_libraries(TARANTULA_UI PRIVATE Qt6::Widgets)
+if(WIN32)
+    target_link_libraries(TARANTULA_UI PRIVATE winmm)
+endif()
 target_include_directories(TARANTULA_UI PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Set WIN32 definition since it was present in the VS project

@@ -29,8 +29,8 @@ public:
 
     std::atomic<float> current_traj_pos{ 0.0f };
     std::atomic<float> current_traj_vel{ 0.0f };
-    std::atomic<float> traj_max_vel{ 3.0f };
-    std::atomic<float> traj_max_accel{ 5.0f };
+    std::atomic<float> traj_max_vel{ 1.0f };
+    std::atomic<float> traj_max_accel{ 4.0f };
 
     std::atomic<bool> active{ false };
     std::atomic<bool> is_trap_traj{ false };
@@ -54,7 +54,7 @@ public:
     void update_from_mit_frame();
     void update_from_encoder_frame();
 
-    bool check_timeout(int64_t now_ms, int64_t timeout_ms = 2000);
+    bool check_timeout(int64_t now_ms, int64_t timeout_ms = 4000);
     MW_MIT_CTRL step_trajectory(int64_t now_ms);    
     
     void enableSafely(int stiffness);
@@ -62,6 +62,7 @@ public:
     static std::pair<float, float> stiffnessToGains(int stiffness);
     bool isSettled(float tolerance_deg) const;
     void setTarget(float pos_rad, int stiffness);
+    void setTargetDirect(float pos_rad, int stiffness);
     MW_MIT_CTRL build_static_mit();
     void tick(int64_t now_ms, uint64_t cycle_count);
 };

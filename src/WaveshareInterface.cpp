@@ -4,6 +4,10 @@
 #include <thread>
 #include <chrono>
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 WaveshareInterface::WaveshareInterface(std::string portStr, int baudRate)
     : port(portStr), baud(baudRate), is_connected(false), tx_running(false) {
     serial = new SimpleSerial(port, baud);
@@ -105,6 +109,40 @@ void WaveshareInterface::send_can_frame(uint32_t can_id, const std::vector<uint8
     // Encolar de forma asíncrona para que el hilo de control no se bloquee por el sleep
     {
         std::lock_guard<std::mutex> lock(tx_mutex);
+
+        // Evitar Buffer Bloat en caso de latencia de red/USB o retrasos de planificación:
+        // Si la cola crece demasiado (>60 tramas), purgamos las tramas antiguas de datos de control
+        // pero CONSERVAMOS las 12 más recientes (el último ciclo completo) y cualquier trama de
+        // configuración (CMD_TYPE_CONFIG). Esto evita la pérdida de conexión y latigazos, asegurando
+        // una respuesta instantánea y continua.
+        if (tx_queue.size() > 60) {
+            std::queue<std::vector<uint8_t>> config_frames;
+            std::vector<std::vector<uint8_t>> data_frames;
+
+            while (!tx_queue.empty()) {
+                auto f = std::move(tx_queue.front());
+                tx_queue.pop();
+                if (f.size() >= 3 && f[2] == Config::CMD_TYPE_CONFIG) {
+                    config_frames.push(std::move(f));
+                } else {
+                    data_frames.push_back(std::move(f));
+                }
+            }
+
+            size_t start_idx = 0;
+            if (data_frames.size() > 12) {
+                start_idx = data_frames.size() - 12;
+            }
+
+            // Reconstruimos la cola conservando las configuraciones y las 12 tramas de datos más nuevas
+            tx_queue = std::move(config_frames);
+            for (size_t i = start_idx; i < data_frames.size(); ++i) {
+                tx_queue.push(std::move(data_frames[i]));
+            }
+
+            std::cout << "⚠️ [WaveshareInterface] Cola de envio saturada (>60 tramas). Purgadas " << start_idx << " tramas antiguas. Conservando las 12 mas recientes.\n";
+        }
+
         tx_queue.push(std::move(frame));
     }
     tx_cv.notify_one();
@@ -178,22 +216,28 @@ void WaveshareInterface::txLoop() {
             tx_queue.pop();
         }
 
+        // Iniciamos el temporizador antes de escribir en el puerto serie.
+        // Esto garantiza que el espaciado entre el inicio de dos tramas consecutivas sea exactamente de 1.0 ms,
+        // absorbiendo el tiempo que tarde la escritura del driver de Windows en retornar.
+        auto start = std::chrono::high_resolution_clock::now();
+
         if (is_connected) {
             serial->writeBytes(frame);
         }
 
-        // Pacing físico preciso para el adaptador USB-CAN.
-        // Usamos un spin-wait de alta precisión para evitar las limitaciones de granularidad
-        // del planificador de Windows (que por defecto es de 15.6 ms).
-        // 1000 microsegundos (1 ms) es el espaciado obligatorio requerido por los motores SteadyWin y el hardware.
-        auto start = std::chrono::high_resolution_clock::now();
+        // Pacing físico preciso de 1500 microsegundos (1.5 ms) desde el inicio del envío de la trama.
+        // Usamos un spin-wait compatible con MSVC y MinGW GCC para evitar que el hilo ceda su turno (yield) y sea penalizado con 15ms de retraso.
         while (tx_running.load(std::memory_order_relaxed)) {
             auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now() - start).count();
-            if (elapsed >= 1000) {
+            if (elapsed >= 2000) {
                 break;
             }
-            std::this_thread::yield();
+#if defined(_MSC_VER)
+            _mm_pause(); // Intrínseco de MSVC
+#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
+            __asm__ __volatile__("pause"); // Ensamblador en línea de GCC/MinGW
+#endif
         }
     }
 }

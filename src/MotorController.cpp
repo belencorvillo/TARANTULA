@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <algorithm>
+#include <iostream>
 
 WaveshareInterface* g_comm = nullptr;
 MotorController* g_controllers[128] = { nullptr };
@@ -81,6 +82,9 @@ bool MotorController::check_timeout(int64_t now_ms, int64_t timeout_ms) {
     if (now_ms > (int64_t)last_msg && (now_ms - (int64_t)last_msg) > timeout_ms) {
         motor_online.store(false, std::memory_order_relaxed);
         active.store(false, std::memory_order_relaxed);
+        std::cout << "⚠️ [MotorController] ¡Timeout! El motor " << (int)node_id 
+                  << " no ha respondido en " << (now_ms - (int64_t)last_msg) << " ms (limite: " 
+                  << timeout_ms << " ms). Desactivando y pasando a IDLE.\n";
         return true;
     }
     return false;
@@ -123,14 +127,8 @@ MW_MIT_CTRL MotorController::step_trajectory(int64_t now_ms)
 
     float abs_p = current_p + pos_offset.load(std::memory_order_relaxed);
 
-    // ✅ Filtro correcto: lee el miembro, calcula, guarda en el miembro
-    constexpr float alpha   = 0.8f;
-    float prev_filtered     = filtered_pos.load(std::memory_order_relaxed);
-    float new_filtered      = alpha * prev_filtered + (1.0f - alpha) * abs_p;
-    filtered_pos.store(new_filtered, std::memory_order_relaxed);
-
     MW_MIT_CTRL mit;
-    mit.pos    = logic_to_phys(new_filtered);          // ✅ usa new_filtered, no una variable tapada
+    mit.pos    = logic_to_phys(abs_p);
     mit.vel    = convert_dir(current_v);
     mit.kp     = target_kp.load(std::memory_order_relaxed);
     mit.kd     = target_kd.load(std::memory_order_relaxed);
@@ -210,6 +208,17 @@ void MotorController::setTarget(float pos_rad, int stiffness)
     target_kp.store(kp);
     target_kd.store(kd);
     is_trap_traj.store(true);
+}
+
+void MotorController::setTargetDirect(float pos_rad, int stiffness)
+{
+    auto [kp, kd] = stiffnessToGains(stiffness);
+    target_pos.store(pos_rad);
+    current_traj_pos.store(pos_rad);
+    current_traj_vel.store(0.0f);
+    target_kp.store(kp);
+    target_kd.store(kd);
+    is_trap_traj.store(false);
 }
 
 void MotorController::tick(int64_t now_ms, uint64_t cycle_count)

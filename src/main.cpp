@@ -6,11 +6,20 @@
 #include "MainWindow.h"
 #include "Config.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <timeapi.h>
+#endif
+
 const float GEAR_RATIO = 8.0f;
-const double SEND_FREQUENCY = 0.015; // 15 ms (66 Hz). La cola asíncrona despacha las 12 tramas en 12 ms (pacing obligatorio de 1.0 ms), dejando 3 ms libres por ciclo.
+const double SEND_FREQUENCY = 0.020; // 20 ms (50 Hz). La cola asíncrona despacha las 12 tramas en 18 ms (pacing de 1.5 ms necesario para evitar latigazos), dejando 2 ms libres por ciclo.
 
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
+    timeBeginPeriod(1); // Ajustar la resolución del temporizador de Windows a 1 ms
+#endif
+
     QApplication app(argc, argv);
 
     std::cout << "Iniciando Waveshare USB-CAN adapter...\n";
@@ -30,5 +39,10 @@ int main(int argc, char* argv[])
 
     robot.stop();
     comm.close();
+
+#ifdef _WIN32
+    timeEndPeriod(1); // Restaurar la resolución original del temporizador de Windows
+#endif
+
     return ret;
 }
