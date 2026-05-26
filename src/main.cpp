@@ -12,7 +12,7 @@
 #endif
 
 const float GEAR_RATIO = 8.0f;
-const double SEND_FREQUENCY = 0.020; // 20 ms (50 Hz). La cola asíncrona despacha las 12 tramas en 18 ms (pacing de 1.5 ms necesario para evitar latigazos), dejando 2 ms libres por ciclo.
+const double SEND_FREQUENCY = 0.02; // 20 ms (50 Hz). La cola asíncrona despacha las 12 tramas en 18 ms (pacing de 1.5 ms necesario para evitar latigazos), dejando 2 ms libres por ciclo.
 
 int main(int argc, char* argv[])
 {
