@@ -40,7 +40,8 @@ public:
     void handleCanFrame(uint32_t can_id, const std::vector<uint8_t>& data);
 
     
-    bool goToPosition(double x, double y, double z, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4, bool knee_up = true); //para cuando tenga la cinemática inversa
+    bool goToPosition(double x, double y, double z, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4, bool knee_up = true, bool direct = false); //para cuando tenga la cinemática inversa
+    bool goToBodyPosition(const Eigen::Vector3d& p_body, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4, bool knee_up = true, bool direct = false);
     void moveJoint(int joint, float pos_deg, int stiffness);
     void waitUntilSettled(const std::atomic<bool>& sequence_active,
                           float tolerance_deg = 10.0f) const;
@@ -74,7 +75,7 @@ private:
     Eigen::Vector3d forwardKinematics(double q1, double q2, double q3)                     const;
 
     //aplica los ángulos a los motores
-    void applyAngles(const JointAngles& angles, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4);
+    void applyAngles(const JointAngles& angles, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4, bool direct = false);
 
     std::atomic<bool> last_command_was_ik_{false};
 };

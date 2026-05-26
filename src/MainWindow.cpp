@@ -3,6 +3,8 @@
 #include "Tarantula.h"
 #include "MotorController.h"
 #include <QTableWidgetItem>
+#include <QGroupBox>
+#include <QGridLayout>
 #include <QString>
 #include <thread>
 
@@ -22,6 +24,91 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
 {
     ui->setupUi(this);
     initTable();
+
+    // Recortar la anchura horizontal de los botones principales del panel derecho
+    ui->btnStartAll->setMaximumWidth(180);
+    ui->btnStopAll->setMaximumWidth(180);
+    ui->btnStandUp->setMaximumWidth(180);
+    ui->btnSitDown->setMaximumWidth(180);
+
+    ui->btnStartAll->setFocusPolicy(Qt::NoFocus);
+    ui->btnStopAll->setFocusPolicy(Qt::NoFocus);
+    ui->btnStandUp->setFocusPolicy(Qt::NoFocus);
+    ui->btnSitDown->setFocusPolicy(Qt::NoFocus);
+
+    // Crear el GroupBox para el D-Pad del Trote
+    QGroupBox* trotGroup = new QGroupBox("Trote Alterno", this);
+    trotGroup->setStyleSheet(
+        "QGroupBox { color: #f9e2af; font-weight: bold; border: 2px solid #313244; border-radius: 6px; padding: 10px; }"
+    );
+    trotGroup->setMaximumWidth(220);
+
+    QGridLayout* gridLayout = new QGridLayout(trotGroup);
+    gridLayout->setSpacing(6);
+    gridLayout->setContentsMargins(5, 5, 5, 5);
+
+    btnTrotUp_ = new QPushButton("▲", this);
+    btnTrotDown_ = new QPushButton("▼", this);
+    btnTrotLeft_ = new QPushButton("◀", this);
+    btnTrotRight_ = new QPushButton("▶", this);
+
+    btnTrotUp_->setFocusPolicy(Qt::NoFocus);
+    btnTrotDown_->setFocusPolicy(Qt::NoFocus);
+    btnTrotLeft_->setFocusPolicy(Qt::NoFocus);
+    btnTrotRight_->setFocusPolicy(Qt::NoFocus);
+
+    // Estilo elegante adaptado al tema oscuro
+    QString btnStyle = "QPushButton { background-color: #313244; color: #cdd6f4; border: 2px solid #45475a; border-radius: 6px; min-width: 45px; min-height: 45px; max-width: 45px; max-height: 45px; font-weight: bold; font-size: 16px; }"
+                       "QPushButton:pressed { background-color: #f9e2af; color: #1e1e2e; }"
+                       "QPushButton:checked { background-color: #f9e2af; color: #1e1e2e; }";
+    btnTrotUp_->setStyleSheet(btnStyle);
+    btnTrotDown_->setStyleSheet(btnStyle);
+    btnTrotLeft_->setStyleSheet(btnStyle);
+    btnTrotRight_->setStyleSheet(btnStyle);
+
+    gridLayout->addWidget(btnTrotUp_, 0, 1);
+    gridLayout->addWidget(btnTrotLeft_, 1, 0);
+    gridLayout->addWidget(btnTrotRight_, 1, 2);
+    gridLayout->addWidget(btnTrotDown_, 2, 1);
+
+    // Conectar señales del D-Pad físico
+    connect(btnTrotUp_, &QPushButton::pressed, [this]() { keyUpPressed_ = true; updateTrotVelocity(); });
+    connect(btnTrotUp_, &QPushButton::released, [this]() { keyUpPressed_ = false; updateTrotVelocity(); });
+
+    connect(btnTrotDown_, &QPushButton::pressed, [this]() { keyDownPressed_ = true; updateTrotVelocity(); });
+    connect(btnTrotDown_, &QPushButton::released, [this]() { keyDownPressed_ = false; updateTrotVelocity(); });
+
+    connect(btnTrotLeft_, &QPushButton::pressed, [this]() { keyLeftPressed_ = true; updateTrotVelocity(); });
+    connect(btnTrotLeft_, &QPushButton::released, [this]() { keyLeftPressed_ = false; updateTrotVelocity(); });
+
+    connect(btnTrotRight_, &QPushButton::pressed, [this]() { keyRightPressed_ = true; updateTrotVelocity(); });
+    connect(btnTrotRight_, &QPushButton::released, [this]() { keyRightPressed_ = false; updateTrotVelocity(); });
+
+    // Extraer los botones de acción del panel derecho y reagruparlos horizontalmente junto con el D-Pad
+    ui->verticalLayout_Right->removeWidget(ui->btnStartAll);
+    ui->verticalLayout_Right->removeWidget(ui->btnStopAll);
+    ui->verticalLayout_Right->removeWidget(ui->btnStandUp);
+    ui->verticalLayout_Right->removeWidget(ui->btnSitDown);
+
+    QVBoxLayout* actionButtonsLayout = new QVBoxLayout();
+    actionButtonsLayout->setSpacing(6);
+    actionButtonsLayout->setContentsMargins(0, 0, 0, 0);
+    actionButtonsLayout->addWidget(ui->btnStartAll);
+    actionButtonsLayout->addWidget(ui->btnStopAll);
+    actionButtonsLayout->addWidget(ui->btnStandUp);
+    actionButtonsLayout->addWidget(ui->btnSitDown);
+
+    QHBoxLayout* topHorizontalLayout = new QHBoxLayout();
+    topHorizontalLayout->setSpacing(15);
+    topHorizontalLayout->setContentsMargins(0, 0, 0, 0);
+    topHorizontalLayout->addLayout(actionButtonsLayout);
+    topHorizontalLayout->addWidget(trotGroup);
+
+    // Añadir un spacer horizontal a la derecha para que todo se agrupe de forma elegante a la izquierda
+    topHorizontalLayout->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
+
+    // Insertar este layout combinado horizontal justo debajo de las etiquetas de USB/CAN (índice 1 en verticalLayout_Right)
+    ui->verticalLayout_Right->insertLayout(1, topHorizontalLayout);
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::updateUI);
@@ -264,4 +351,102 @@ void MainWindow::on_btnResetPose_clicked()
     ui->lblBodyYaw->setText("0°");
 
     robot_->standUp();
+}
+
+void MainWindow::updateTrotVelocity()
+{
+    float vx = 0.0f;
+    float vy = 0.0f;
+
+    if (keyUpPressed_)    vx += 0.04f; // Adelante +X
+    if (keyDownPressed_)  vx -= 0.04f; // Atrás -X
+    if (keyLeftPressed_)  vy -= 0.04f; // Izquierda -Y (Y es positivo a la derecha)
+    if (keyRightPressed_) vy += 0.04f; // Derecha +Y
+
+    bool walking = (std::abs(vx) > 0.001f || std::abs(vy) > 0.001f);
+
+    if (walking) {
+        if (!robot_->isGaitActive()) {
+            robot_->startGait();
+        }
+        robot_->setGaitVelocity(vx, vy);
+    } else {
+        if (robot_->isGaitActive()) {
+            robot_->stopGait();
+        }
+    }
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event)
+{
+    if (event->isAutoRepeat()) return;
+
+    bool handled = false;
+    switch (event->key()) {
+    case Qt::Key_Up:
+        keyUpPressed_ = true;
+        if (btnTrotUp_) btnTrotUp_->setDown(true);
+        handled = true;
+        break;
+    case Qt::Key_Down:
+        keyDownPressed_ = true;
+        if (btnTrotDown_) btnTrotDown_->setDown(true);
+        handled = true;
+        break;
+    case Qt::Key_Left:
+        keyLeftPressed_ = true;
+        if (btnTrotLeft_) btnTrotLeft_->setDown(true);
+        handled = true;
+        break;
+    case Qt::Key_Right:
+        keyRightPressed_ = true;
+        if (btnTrotRight_) btnTrotRight_->setDown(true);
+        handled = true;
+        break;
+    default:
+        break;
+    }
+
+    if (handled) {
+        updateTrotVelocity();
+    } else {
+        QMainWindow::keyPressEvent(event);
+    }
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent* event)
+{
+    if (event->isAutoRepeat()) return;
+
+    bool handled = false;
+    switch (event->key()) {
+    case Qt::Key_Up:
+        keyUpPressed_ = false;
+        if (btnTrotUp_) btnTrotUp_->setDown(false);
+        handled = true;
+        break;
+    case Qt::Key_Down:
+        keyDownPressed_ = false;
+        if (btnTrotDown_) btnTrotDown_->setDown(false);
+        handled = true;
+        break;
+    case Qt::Key_Left:
+        keyLeftPressed_ = false;
+        if (btnTrotLeft_) btnTrotLeft_->setDown(false);
+        handled = true;
+        break;
+    case Qt::Key_Right:
+        keyRightPressed_ = false;
+        if (btnTrotRight_) btnTrotRight_->setDown(false);
+        handled = true;
+        break;
+    default:
+        break;
+    }
+
+    if (handled) {
+        updateTrotVelocity();
+    } else {
+        QMainWindow::keyReleaseEvent(event);
+    }
 }

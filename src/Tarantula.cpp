@@ -147,7 +147,7 @@ void Tarantula::runStandUpSequence()
 
     for (Leg* leg : legs_) {
         leg->moveJoint(1, 0.0f, 3);
-        leg->moveJoint(2, 24.0f, 4);
+        leg->moveJoint(2, 20.0f, 5);
         leg->moveJoint(3, -100.0f, 4);
     }
 
@@ -264,9 +264,33 @@ void Tarantula::tickAllLegs(uint64_t cycle_count)
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
 
+    // Actualizar el control del trote diagonal en tiempo real
+    gait_controller_.tick(legs_, now_ms);
+
     for (Leg* leg : legs_) {
         if (leg) leg->tick(now_ms, cycle_count);
     }
+}
+
+void Tarantula::setGaitVelocity(float vx, float vy)
+{
+    gait_controller_.setVelocity(vx, vy);
+}
+
+void Tarantula::startGait()
+{
+    abortSequence(); // Abortar cualquier secuencia de levantarse/acostarse activa
+    gait_controller_.start();
+}
+
+void Tarantula::stopGait()
+{
+    gait_controller_.stop();
+}
+
+bool Tarantula::isGaitActive() const
+{
+    return gait_controller_.isActive();
 }
 
 

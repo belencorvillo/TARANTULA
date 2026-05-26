@@ -30,6 +30,8 @@ add_executable(TARANTULA_UI
     include/SteadyWinMotor.h
     src/WaveshareInterface.cpp
     include/WaveshareInterface.h
+    src/GaitController.cpp
+    include/GaitController.h
     include/Config.h
 )
 

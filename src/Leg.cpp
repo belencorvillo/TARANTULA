@@ -56,14 +56,20 @@ bool Leg::isEnabled() const
     return false;
 }
 
-bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3, bool knee_up)
+bool Leg::goToPosition(double x, double y, double z, int stiffness_q1, int stiffness_q2, int stiffness_q3, bool knee_up, bool direct)
 {
     //ESTO LO USAREMOS CUANDO TENGA LA CINEMÁTICA INVERSA
     JointAngles angles = solveIK(x, y, z, knee_up);
     if (!angles.valid) return false;
-    applyAngles(angles, stiffness_q1, stiffness_q2, stiffness_q3);
+    applyAngles(angles, stiffness_q1, stiffness_q2, stiffness_q3, direct);
     last_command_was_ik_.store(true, std::memory_order_relaxed);
     return true;
+}
+
+bool Leg::goToBodyPosition(const Eigen::Vector3d& p_body, int stiffness_q1, int stiffness_q2, int stiffness_q3, bool knee_up, bool direct)
+{
+    Eigen::Vector3d p_local = leg_to_body_.inverse() * p_body;
+    return goToPosition(p_local.x(), p_local.y(), p_local.z(), stiffness_q1, stiffness_q2, stiffness_q3, knee_up, direct);
 }
 
 void Leg::moveJoint(int joint, float pos_deg, int stiffness)
@@ -125,10 +131,10 @@ Eigen::Vector3d Leg::getCurrentFootPosition() const
 
 void Leg::captureInitialFootPosition()
 {
-    // Usamos los ángulos ideales de diseño (q1=0.0, q2=24.0°, q3=-100.0°) de la pose de pie
+    // Usamos los ángulos ideales de diseño (q1=0.0, q2=20.0°, q3=-100.0°) de la pose de pie
     // para asegurar que las referencias iniciales de los pies sean perfectamente simétricas y libres de ruido.
     double q1_ideal = 0.0;
-    double q2_ideal = 24.0 * M_PI / 180.0;
+    double q2_ideal = 20.0 * M_PI / 180.0;
     double q3_ideal = -100.0 * M_PI / 180.0;
     
     Eigen::Vector3d p_local = forwardKinematics(q1_ideal, q2_ideal, q3_ideal);
@@ -247,14 +253,18 @@ Eigen::Vector3d Leg::forwardKinematics(double q1, double q2, double q3) const
 
 
 
-void Leg::applyAngles(const JointAngles& angles, int stiffness_q1, int stiffness_q2, int stiffness_q3)
+void Leg::applyAngles(const JointAngles& angles, int stiffness_q1, int stiffness_q2, int stiffness_q3, bool direct)
 {
     double qs[3] = { angles.q1, angles.q2, angles.q3 };
     int stiffnesses[3] = { stiffness_q1, stiffness_q2, stiffness_q3 };
 
     for (int i = 0; i < 3; ++i) {
         if (motor_[i].active.load(std::memory_order_relaxed)) {
-            motor_[i].setTarget(static_cast<float>(qs[i]), stiffnesses[i]);
+            if (direct) {
+                motor_[i].setTargetDirect(static_cast<float>(qs[i]), stiffnesses[i]);
+            } else {
+                motor_[i].setTarget(static_cast<float>(qs[i]), stiffnesses[i]);
+            }
         }
     }
 }

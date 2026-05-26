@@ -1,8 +1,8 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
-
+#pragma once
 #include <QMainWindow>
 #include <QTimer>
+#include <QKeyEvent>
+#include <QPushButton>
 
 // Declaración adelantada: la GUI solo conoce la interfaz de Tarantula
 class Tarantula;
@@ -18,6 +18,11 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(Tarantula* robot, QWidget* parent = nullptr);
     ~MainWindow();
+
+protected:
+    // Eventos de teclado para control por flechas
+    void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
 
 private slots:
     // Actualización periódica de la UI (timer 100 ms)
@@ -49,6 +54,20 @@ private:
     Tarantula*      robot_;
     QTimer*         timer_;
 
+    // Punteros para los botones del D-Pad dinámico (Cruz)
+    QPushButton* btnTrotUp_{nullptr};
+    QPushButton* btnTrotDown_{nullptr};
+    QPushButton* btnTrotLeft_{nullptr};
+    QPushButton* btnTrotRight_{nullptr};
+
+    // Flags para rastrear la pulsación de teclas físicas de dirección
+    bool keyUpPressed_{false};
+    bool keyDownPressed_{false};
+    bool keyLeftPressed_{false};
+    bool keyRightPressed_{false};
+
+    void updateTrotVelocity();
+
     
     void initTable();
     void updateStatusLeds();
@@ -60,5 +79,3 @@ private:
     
     void sendCurrentBodyPose();
 };
-
-#endif // MAINWINDOW_H
