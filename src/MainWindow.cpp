@@ -36,8 +36,8 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
     ui->btnStandUp->setFocusPolicy(Qt::NoFocus);
     ui->btnSitDown->setFocusPolicy(Qt::NoFocus);
 
-    // Crear el GroupBox para el D-Pad del Trote
-    QGroupBox* trotGroup = new QGroupBox("Trote Alterno", this);
+    // Crear el GroupBox para el D-Pad de Control de Marcha
+    QGroupBox* trotGroup = new QGroupBox("Marcha", this);
     trotGroup->setStyleSheet(
         "QGroupBox { color: #f9e2af; font-weight: bold; border: 2px solid #313244; border-radius: 6px; padding: 10px; }"
     );

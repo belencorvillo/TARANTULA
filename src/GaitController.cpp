@@ -74,10 +74,17 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
     double Sx = vx * GAIT_PERIOD;
     double Sy = vy * GAIT_PERIOD;
 
-    // Parejas diagonales:
-    // Pareja A: Pata 1 (index 0) y Pata 3 (index 2) -> desfase = 0
-    // Pareja B: Pata 2 (index 1) y Pata 4 (index 3) -> desfase = PI
-    double offsets[4] = { 0.0, M_PI, 0.0, M_PI };
+    // Secuencia de Creep Gait (Estabilidad Estática):
+    // Cada pata pasa el 25% de la fase en vuelo (swing) y el 75% en apoyo (stance).
+    // Secuencia de oscilación ordenada para mantener siempre el polígono de sustentación:
+    // Pata 0 (RF) -> Pata 2 (BL) -> Pata 1 (FL) -> Pata 3 (BR)
+    // Desfases correspondientes en radianes:
+    double offsets[4] = {
+        0.0,            // Pata 0 (RF) -> Vuela en [0, 0.5*PI)
+        M_PI,           // Pata 1 (FL) -> Vuela en [PI, 1.5*PI)
+        1.5 * M_PI,     // Pata 2 (BL) -> Vuela en [0.5*PI, PI)
+        0.5 * M_PI      // Pata 3 (BR) -> Vuela en [1.5*PI, 2*PI)
+    };
 
     for (int i = 0; i < 4; ++i) {
         Leg* leg = legs[i];
@@ -90,15 +97,15 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
         double y_rel = 0.0;
         double z_rel = 0.0;
 
-        if (leg_phase < M_PI) {
-            // ─── FASE DE VUELO (SWING) ───
-            double sigma = leg_phase / M_PI; // [0, 1)
+        if (leg_phase < 0.5 * M_PI) {
+            // ─── FASE DE VUELO (SWING - 25% del ciclo) ───
+            double sigma = leg_phase / (0.5 * M_PI); // [0, 1)
             x_rel = -Sx / 2.0 + Sx * sigma;
             y_rel = -Sy / 2.0 + Sy * sigma;
             z_rel = SWING_HEIGHT * std::sin(M_PI * sigma);
         } else {
-            // ─── FASE DE APOYO (STANCE) ───
-            double sigma = (leg_phase - M_PI) / M_PI; // [0, 1)
+            // ─── FASE DE APOYO (STANCE - 75% del ciclo) ───
+            double sigma = (leg_phase - 0.5 * M_PI) / (1.5 * M_PI); // [0, 1)
             x_rel = Sx / 2.0 - Sx * sigma;
             y_rel = Sy / 2.0 - Sy * sigma;
             z_rel = 0.0;
@@ -115,15 +122,17 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
     }
 
     // ─── ALGORITMO DE FRENADO ULTRA-SUAVE (SOFT SETTLE) ───
-    // Si se ha pedido detener la marcha, esperamos a que la fase esté en una zona de apoyo 
-    // plano (cerca de 0, PI o 2*PI) para que las patas en el aire aterricen con suavidad,
-    // y entonces reseteamos la fase a 0.0 clavando el robot en su pose de levantado perfecta.
+    // Si se ha pedido detener la marcha, esperamos a que la fase esté en una zona donde
+    // la pata en vuelo esté tocando el suelo (múltiplos de 0.5*PI: 0, 0.5*PI, PI, 1.5*PI o 2*PI).
+    // Esto garantiza que todas las patas tengan apoyo firme antes de clavar el robot.
     if (!active_.load() && !walking) {
         double diff_0 = std::abs(phase_);
+        double diff_half_pi = std::abs(phase_ - 0.5 * M_PI);
         double diff_pi = std::abs(phase_ - M_PI);
+        double diff_1_5_pi = std::abs(phase_ - 1.5 * M_PI);
         double diff_2pi = std::abs(phase_ - 2.0 * M_PI);
 
-        if (diff_0 < 0.15 || diff_pi < 0.15 || diff_2pi < 0.15) {
+        if (diff_0 < 0.15 || diff_half_pi < 0.15 || diff_pi < 0.15 || diff_1_5_pi < 0.15 || diff_2pi < 0.15) {
             phase_ = 0.0;
             for (int i = 0; i < 4; ++i) {
                 if (legs[i]) {
