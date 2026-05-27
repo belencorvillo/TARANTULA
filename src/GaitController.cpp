@@ -56,10 +56,17 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
 
     float vx = target_vx_.load();
     float vy = target_vy_.load();
+
+    // Clampear la velocidad de consigna para evitar superar los límites cinemáticos (alcance de las patas)
+    // El alcance máximo es ~41 cm. Un paso máximo seguro de 8 cm (velocidad 0.08 m/s con período de 1.0s) es muy adecuado.
+    static constexpr float MAX_SPEED = 0.08f; // m/s
+    vx = std::clamp(vx, -MAX_SPEED, MAX_SPEED);
+    vy = std::clamp(vy, -MAX_SPEED, MAX_SPEED);
+
     bool walking = (std::abs(vx) > 0.001f || std::abs(vy) > 0.001f);
 
-    // Si no está activo y la velocidad es 0, y ya estamos parados en pose neutra (fase 0), no hacemos nada.
-    if (!active_.load() && !walking && phase_ == 0.0) {
+    // Si no está activo y la velocidad es 0, y ya estamos parados en pose neutra (fase < epsilon), no hacemos nada.
+    if (!active_.load() && !walking && std::abs(phase_) < 1e-5) {
         return;
     }
 
