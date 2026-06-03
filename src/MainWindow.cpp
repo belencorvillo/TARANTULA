@@ -6,6 +6,10 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QString>
+#include <QComboBox>
+#include <QSlider>
+#include <QLabel>
+#include <QMessageBox>
 #include <thread>
 
 static constexpr float RAD_TO_DEG = 180.0f / 3.14159265358979f;
@@ -98,17 +102,136 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
     actionButtonsLayout->addWidget(ui->btnStandUp);
     actionButtonsLayout->addWidget(ui->btnSitDown);
 
+    // Crear el GroupBox para el Control IK de Pata
+    QGroupBox* legIkGroup = new QGroupBox("Control IK Pata", this);
+    legIkGroup->setStyleSheet(
+        "QGroupBox { color: #89b4fa; font-weight: bold; border: 2px solid #313244; border-radius: 6px; padding: 10px; }"
+    );
+    legIkGroup->setMinimumWidth(280);
+    legIkGroup->setMaximumWidth(320);
+
+    QGridLayout* legIkLayout = new QGridLayout(legIkGroup);
+    legIkLayout->setSpacing(6);
+    legIkLayout->setContentsMargins(5, 5, 5, 5);
+
+    // Selector de Pata
+    QLabel* lblLegSel = new QLabel("Pata:", this);
+    lblLegSel->setStyleSheet("color: #a6adc8; font-weight: bold;");
+    comboLegSelect_ = new QComboBox(this);
+    comboLegSelect_->addItems({"Pata 1 (DD)", "Pata 2 (DI)", "Pata 3 (TI)", "Pata 4 (TD)"});
+    comboLegSelect_->setStyleSheet(
+        "QComboBox { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 3px; }"
+        "QComboBox QAbstractItemView { background-color: #1e1e2e; color: #cdd6f4; selection-background-color: #89b4fa; selection-color: #1e1e2e; }"
+    );
+    comboLegSelect_->setFocusPolicy(Qt::NoFocus);
+
+    legIkLayout->addWidget(lblLegSel, 0, 0);
+    legIkLayout->addWidget(comboLegSelect_, 0, 1, 1, 2);
+
+    // Slider X
+    QLabel* lblLabelX = new QLabel("X:", this);
+    lblLabelX->setStyleSheet("color: #a6adc8; font-weight: bold;");
+    sliderLegX_ = new QSlider(Qt::Horizontal, this);
+    sliderLegX_->setRange(200, 495);
+    sliderLegX_->setValue(495);
+    sliderLegX_->setStyleSheet(
+        "QSlider::groove:horizontal { border: 1px solid #45475a; height: 6px; background: #313244; border-radius: 3px; }"
+        "QSlider::handle:horizontal { background: #89b4fa; border: 1px solid #89b4fa; width: 14px; height: 14px; margin: -4px 0; border-radius: 7px; }"
+    );
+    sliderLegX_->setFocusPolicy(Qt::NoFocus);
+    lblLegX_ = new QLabel("495 mm", this);
+    lblLegX_->setStyleSheet("color: #cdd6f4; font-weight: bold; min-width: 55px;");
+    lblLegX_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    legIkLayout->addWidget(lblLabelX, 1, 0);
+    legIkLayout->addWidget(sliderLegX_, 1, 1);
+    legIkLayout->addWidget(lblLegX_, 1, 2);
+
+    // Slider Y
+    QLabel* lblLabelY = new QLabel("Y:", this);
+    lblLabelY->setStyleSheet("color: #a6adc8; font-weight: bold;");
+    sliderLegY_ = new QSlider(Qt::Horizontal, this);
+    sliderLegY_->setRange(-300, 300);
+    sliderLegY_->setValue(0);
+    sliderLegY_->setStyleSheet(
+        "QSlider::groove:horizontal { border: 1px solid #45475a; height: 6px; background: #313244; border-radius: 3px; }"
+        "QSlider::handle:horizontal { background: #89b4fa; border: 1px solid #89b4fa; width: 14px; height: 14px; margin: -4px 0; border-radius: 7px; }"
+    );
+    sliderLegY_->setFocusPolicy(Qt::NoFocus);
+    lblLegY_ = new QLabel("0 mm", this);
+    lblLegY_->setStyleSheet("color: #cdd6f4; font-weight: bold; min-width: 55px;");
+    lblLegY_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    legIkLayout->addWidget(lblLabelY, 2, 0);
+    legIkLayout->addWidget(sliderLegY_, 2, 1);
+    legIkLayout->addWidget(lblLegY_, 2, 2);
+
+    // Slider Z
+    QLabel* lblLabelZ = new QLabel("Z:", this);
+    lblLabelZ->setStyleSheet("color: #a6adc8; font-weight: bold;");
+    sliderLegZ_ = new QSlider(Qt::Horizontal, this);
+    sliderLegZ_->setRange(-350, 150);
+    sliderLegZ_->setValue(0);
+    sliderLegZ_->setStyleSheet(
+        "QSlider::groove:horizontal { border: 1px solid #45475a; height: 6px; background: #313244; border-radius: 3px; }"
+        "QSlider::handle:horizontal { background: #89b4fa; border: 1px solid #89b4fa; width: 14px; height: 14px; margin: -4px 0; border-radius: 7px; }"
+    );
+    sliderLegZ_->setFocusPolicy(Qt::NoFocus);
+    lblLegZ_ = new QLabel("0 mm", this);
+    lblLegZ_->setStyleSheet("color: #cdd6f4; font-weight: bold; min-width: 55px;");
+    lblLegZ_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    legIkLayout->addWidget(lblLabelZ, 3, 0);
+    legIkLayout->addWidget(sliderLegZ_, 3, 1);
+    legIkLayout->addWidget(lblLegZ_, 3, 2);
+
+    // Botón Sincronizar / Resetear
+    btnResetLeg_ = new QPushButton("Nominal / Sinc", this);
+    btnResetLeg_->setStyleSheet(
+        "QPushButton { background-color: #313244; color: #a6e3a1; border: 2px solid #45475a; border-radius: 6px; padding: 4px; font-weight: bold; }"
+        "QPushButton:pressed { background-color: #a6e3a1; color: #1e1e2e; }"
+    );
+    btnResetLeg_->setFocusPolicy(Qt::NoFocus);
+    legIkLayout->addWidget(btnResetLeg_, 4, 1, 1, 2);
+
+    // Conectar señales del panel de pata individual
+    connect(comboLegSelect_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::resetIndividualLegSliders);
+    connect(sliderLegX_, &QSlider::valueChanged, this, &MainWindow::sendCurrentIndividualLegTarget);
+    connect(sliderLegY_, &QSlider::valueChanged, this, &MainWindow::sendCurrentIndividualLegTarget);
+    connect(sliderLegZ_, &QSlider::valueChanged, this, &MainWindow::sendCurrentIndividualLegTarget);
+    connect(btnResetLeg_, &QPushButton::clicked, [this]() {
+        if (sliderLegX_ && sliderLegY_ && sliderLegZ_) {
+            sliderLegX_->blockSignals(true);
+            sliderLegY_->blockSignals(true);
+            sliderLegZ_->blockSignals(true);
+
+            sliderLegX_->setValue(495);
+            sliderLegY_->setValue(0);
+            sliderLegZ_->setValue(0);
+
+            sliderLegX_->blockSignals(false);
+            sliderLegY_->blockSignals(false);
+            sliderLegZ_->blockSignals(false);
+
+            sendCurrentIndividualLegTarget();
+        }
+    });
+
     QHBoxLayout* topHorizontalLayout = new QHBoxLayout();
     topHorizontalLayout->setSpacing(15);
     topHorizontalLayout->setContentsMargins(0, 0, 0, 0);
     topHorizontalLayout->addLayout(actionButtonsLayout);
     topHorizontalLayout->addWidget(trotGroup);
+    topHorizontalLayout->addWidget(legIkGroup);
 
     // Añadir un spacer horizontal a la derecha para que todo se agrupe de forma elegante a la izquierda
     topHorizontalLayout->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     // Insertar este layout combinado horizontal justo debajo de las etiquetas de USB/CAN (índice 1 en verticalLayout_Right)
     ui->verticalLayout_Right->insertLayout(1, topHorizontalLayout);
+
+    // Inicializar sliders con la posición real de la pata seleccionada por defecto
+    resetIndividualLegSliders();
 
     timer_ = new QTimer(this);
     connect(timer_, &QTimer::timeout, this, &MainWindow::updateUI);
@@ -303,13 +426,6 @@ void MainWindow::sendCurrentBodyPose()
     int valPitch = ui->sliderBodyPitch->value();
     int valYaw = ui->sliderBodyYaw->value();
 
-    ui->lblBodyX->setText(QString("%1 mm").arg(valX));
-    ui->lblBodyY->setText(QString("%1 mm").arg(valY));
-    ui->lblBodyZ->setText(QString("%1 mm").arg(valZ));
-    ui->lblBodyRoll->setText(QString("%1°").arg(valRoll));
-    ui->lblBodyPitch->setText(QString("%1°").arg(valPitch));
-    ui->lblBodyYaw->setText(QString("%1°").arg(valYaw));
-
     double dx    = valX * SLIDER_XYZ_SCALE;
     double dy    = valY * SLIDER_XYZ_SCALE;
     double dz    = valZ * SLIDER_XYZ_SCALE;
@@ -317,11 +433,65 @@ void MainWindow::sendCurrentBodyPose()
     double pitch = valPitch * SLIDER_ANGLE_SCALE;
     double yaw   = valYaw * SLIDER_ANGLE_SCALE;
 
-    robot_->setBodyPose(dx, dy, dz, roll, pitch, yaw);
+    if (robot_->setBodyPose(dx, dy, dz, roll, pitch, yaw)) {
+        last_valid_body_x_ = valX;
+        last_valid_body_y_ = valY;
+        last_valid_body_z_ = valZ;
+        last_valid_body_roll_ = valRoll;
+        last_valid_body_pitch_ = valPitch;
+        last_valid_body_yaw_ = valYaw;
+
+        ui->lblBodyX->setText(QString("%1 mm").arg(valX));
+        ui->lblBodyY->setText(QString("%1 mm").arg(valY));
+        ui->lblBodyZ->setText(QString("%1 mm").arg(valZ));
+        ui->lblBodyRoll->setText(QString("%1°").arg(valRoll));
+        ui->lblBodyPitch->setText(QString("%1°").arg(valPitch));
+        ui->lblBodyYaw->setText(QString("%1°").arg(valYaw));
+    } else {
+        ui->sliderBodyX->blockSignals(true);
+        ui->sliderBodyY->blockSignals(true);
+        ui->sliderBodyZ->blockSignals(true);
+        ui->sliderBodyRoll->blockSignals(true);
+        ui->sliderBodyPitch->blockSignals(true);
+        ui->sliderBodyYaw->blockSignals(true);
+
+        ui->sliderBodyX->setValue(last_valid_body_x_);
+        ui->sliderBodyY->setValue(last_valid_body_y_);
+        ui->sliderBodyZ->setValue(last_valid_body_z_);
+        ui->sliderBodyRoll->setValue(last_valid_body_roll_);
+        ui->sliderBodyPitch->setValue(last_valid_body_pitch_);
+        ui->sliderBodyYaw->setValue(last_valid_body_yaw_);
+
+        ui->sliderBodyX->blockSignals(false);
+        ui->sliderBodyY->blockSignals(false);
+        ui->sliderBodyZ->blockSignals(false);
+        ui->sliderBodyRoll->blockSignals(false);
+        ui->sliderBodyPitch->blockSignals(false);
+        ui->sliderBodyYaw->blockSignals(false);
+
+        QMessageBox msg(this);
+        msg.setWindowTitle("Postura Inválida");
+        msg.setText("La postura solicitada no es factible o causaría una colisión.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.setStyleSheet(
+            "QMessageBox { background-color: #1e1e2e; color: #cdd6f4; }"
+            "QLabel { color: #cdd6f4; }"
+            "QPushButton { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 4px; min-width: 60px; }"
+            "QPushButton:pressed { background-color: #f38ba8; color: #1e1e2e; }"
+        );
+        msg.exec();
+    }
 }
 
 void MainWindow::on_btnResetPose_clicked()
 {
+    last_valid_body_x_ = 0;
+    last_valid_body_y_ = 0;
+    last_valid_body_z_ = 0;
+    last_valid_body_roll_ = 0;
+    last_valid_body_pitch_ = 0;
+    last_valid_body_yaw_ = 0;
+
     ui->sliderBodyX->blockSignals(true);
     ui->sliderBodyY->blockSignals(true);
     ui->sliderBodyZ->blockSignals(true);
@@ -449,4 +619,85 @@ void MainWindow::keyReleaseEvent(QKeyEvent* event)
     } else {
         QMainWindow::keyReleaseEvent(event);
     }
+}
+
+void MainWindow::sendCurrentIndividualLegTarget()
+{
+    if (!comboLegSelect_ || !sliderLegX_ || !sliderLegY_ || !sliderLegZ_ || !lblLegX_ || !lblLegY_ || !lblLegZ_) return;
+
+    int leg_idx = comboLegSelect_->currentIndex();
+    int leg_id = leg_idx + 1;
+
+    int valX = sliderLegX_->value();
+    int valY = sliderLegY_->value();
+    int valZ = sliderLegZ_->value();
+
+    double x = valX * 0.001; // mm to m
+    double y = valY * 0.001;
+    double z = valZ * 0.001;
+
+    if (robot_->moveLeg(leg_id, x, y, z)) {
+        lblLegX_->setText(QString("%1 mm").arg(valX));
+        lblLegY_->setText(QString("%1 mm").arg(valY));
+        lblLegZ_->setText(QString("%1 mm").arg(valZ));
+    } else {
+        sliderLegX_->blockSignals(true);
+        sliderLegY_->blockSignals(true);
+        sliderLegZ_->blockSignals(true);
+
+        resetIndividualLegSliders();
+
+        sliderLegX_->blockSignals(false);
+        sliderLegY_->blockSignals(false);
+        sliderLegZ_->blockSignals(false);
+
+        QMessageBox msg(this);
+        msg.setWindowTitle("Movimiento Inválido");
+        msg.setText("El movimiento de la pata no es factible o provocaría una colisión.");
+        msg.setIcon(QMessageBox::Warning);
+        msg.setStyleSheet(
+            "QMessageBox { background-color: #1e1e2e; color: #cdd6f4; }"
+            "QLabel { color: #cdd6f4; }"
+            "QPushButton { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 4px; min-width: 60px; }"
+            "QPushButton:pressed { background-color: #f38ba8; color: #1e1e2e; }"
+        );
+        msg.exec();
+    }
+}
+
+void MainWindow::resetIndividualLegSliders()
+{
+    if (!comboLegSelect_ || !sliderLegX_ || !sliderLegY_ || !sliderLegZ_ || !lblLegX_ || !lblLegY_ || !lblLegZ_) return;
+
+    int leg_idx = comboLegSelect_->currentIndex();
+    int leg_id = leg_idx + 1;
+
+    Eigen::Vector3d current_pos = robot_->getLeg(leg_id).getCurrentFootPosition();
+
+    int x_mm = static_cast<int>(std::round(current_pos.x() * 1000.0));
+    int y_mm = static_cast<int>(std::round(current_pos.y() * 1000.0));
+    int z_mm = static_cast<int>(std::round(current_pos.z() * 1000.0));
+
+    // Si la posición leída es descabellada o fuera del alcance de los sliders, forzar nominal
+    if (x_mm < 150 || x_mm > 500 || y_mm < -300 || y_mm > 300 || z_mm < -350 || z_mm > 150) {
+        x_mm = 495;
+        y_mm = 0;
+        z_mm = 0;
+    }
+
+    sliderLegX_->blockSignals(true);
+    sliderLegY_->blockSignals(true);
+    sliderLegZ_->blockSignals(true);
+
+    sliderLegX_->setValue(x_mm);
+    sliderLegY_->setValue(y_mm);
+    sliderLegZ_->setValue(z_mm);
+
+    sliderLegX_->blockSignals(false);
+    sliderLegY_->blockSignals(false);
+    sliderLegZ_->blockSignals(false);
+
+    lblLegX_->setText(QString("%1 mm").arg(x_mm));
+    lblLegY_->setText(QString("%1 mm").arg(y_mm));
+    lblLegZ_->setText(QString("%1 mm").arg(z_mm));
 }

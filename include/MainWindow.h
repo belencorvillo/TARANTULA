@@ -6,6 +6,9 @@
 
 // Declaración adelantada: la GUI solo conoce la interfaz de Tarantula
 class Tarantula;
+class QComboBox;
+class QSlider;
+class QLabel;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -49,6 +52,10 @@ private slots:
     void on_sliderBodyYaw_valueChanged(int value);
     void on_btnResetPose_clicked();
 
+    // Slots para control IK de pata individual
+    void sendCurrentIndividualLegTarget();
+    void resetIndividualLegSliders();
+
 private:
     Ui::MainWindow* ui;
     Tarantula*      robot_;
@@ -59,6 +66,16 @@ private:
     QPushButton* btnTrotDown_{nullptr};
     QPushButton* btnTrotLeft_{nullptr};
     QPushButton* btnTrotRight_{nullptr};
+
+    // Punteros para el control IK de pata individual
+    QComboBox*   comboLegSelect_{nullptr};
+    QSlider*     sliderLegX_{nullptr};
+    QSlider*     sliderLegY_{nullptr};
+    QSlider*     sliderLegZ_{nullptr};
+    QLabel*      lblLegX_{nullptr};
+    QLabel*      lblLegY_{nullptr};
+    QLabel*      lblLegZ_{nullptr};
+    QPushButton* btnResetLeg_{nullptr};
 
     // Flags para rastrear la pulsación de teclas físicas de dirección
     bool keyUpPressed_{false};
@@ -78,4 +95,11 @@ private:
 
     
     void sendCurrentBodyPose();
+
+    int last_valid_body_x_{0};
+    int last_valid_body_y_{0};
+    int last_valid_body_z_{0};
+    int last_valid_body_roll_{0};
+    int last_valid_body_pitch_{0};
+    int last_valid_body_yaw_{0};
 };

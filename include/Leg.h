@@ -2,7 +2,11 @@
 #include <cmath>
 #include <utility>
 #include <atomic>
+#include <optional>
+#include <vector>
 #include "MotorController.h"
+
+class Tarantula;
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -20,13 +24,13 @@ struct JointAngles {
 
 class Leg {
 public:
-    // Physical geometry constants
-    static constexpr double R_HIP = 0.15;   // m, body radius to hip joint
-    static constexpr double L1 = 0.08;      // m, coxa length
-    static constexpr double L2 = 0.19;      // m, femur length
-    static constexpr double L3 = 0.225;     // m, tibia length
+    
+    static constexpr double R_HIP = 0.15;   
+    static constexpr double L1 = 0.08;      
+    static constexpr double L2 = 0.188;      
+    static constexpr double L3 = 0.211;    
 
-    Leg(int leg_id, double theta);
+    Leg(int leg_id, double theta, Tarantula* parent = nullptr);
     ~Leg();
 
    
@@ -46,6 +50,11 @@ public:
     void waitUntilSettled(const std::atomic<bool>& sequence_active,
                           float tolerance_deg = 10.0f) const;
 
+    bool isIKPossible(double x, double y, double z, const JointAngles& angles, bool knee_up = true) const;
+    bool isLocalPositionIKValid(const Eigen::Vector3d& p_local, bool knee_up = true) const;
+    JointAngles getCurrentJointAngles() const;
+    std::vector<Eigen::Vector3d> getJointPositionsInBodyFrame(const JointAngles& a) const;
+
    
     bool  isGrounded()             const;  // para cuando implemente los sensores de efecto Hall
     float getJointAngle(int joint) const;  
@@ -54,7 +63,7 @@ public:
     
     int id() const { return leg_id_; }
 
-    // Coordinate transformation and foot target methods
+    
     void captureInitialFootPosition();
     Eigen::Vector3d getInitialFootPosition() const { return initial_foot_position_; }
     Eigen::Vector3d computeFootTarget(double dx, double dy, double dz, double roll, double pitch, double yaw = 0.0) const;
@@ -63,15 +72,19 @@ private:
     int              leg_id_;
     double           theta_;
     Eigen::Isometry3d leg_to_body_;
-    Eigen::Vector3d   initial_foot_position_; // position in body frame
+    Eigen::Vector3d   initial_foot_position_; 
     MotorController motor_[3];  // [0]=q1  [1]=q2  [2]=q3
+    Tarantula*       parent_;
 
-    
-    JointAngles solveIK(double x, double y, double z, bool knee_up = true)                           const;
+    std::optional<JointAngles> solveIK(double x, double y, double z, bool knee_up = true)            const;
     bool        isWithinReach(double s, double d)                               const;
     bool        isWithinJointLimits(const JointAngles& angles, bool knee_up = true)                  const;
 
-    
+    bool checkLegCollisions(const JointAngles& proposed_angles) const;
+    double ClosestPtSegmentSegment(const Eigen::Vector3d& p1, const Eigen::Vector3d& p2,
+                                   const Eigen::Vector3d& q1, const Eigen::Vector3d& q2,
+                                   double &s, double &t, Eigen::Vector3d &c1, Eigen::Vector3d &c2) const;
+
     Eigen::Vector3d forwardKinematics(double q1, double q2, double q3)                     const;
 
     //aplica los ángulos a los motores
