@@ -59,7 +59,7 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
 
     // Clampear la velocidad de consigna para evitar superar los límites cinemáticos (alcance de las patas)
     // El alcance máximo es ~41 cm. Un paso máximo seguro de 8 cm (velocidad 0.08 m/s con período de 1.0s) es muy adecuado.
-    static constexpr float MAX_SPEED = 0.08f; // m/s
+    static constexpr float MAX_SPEED = 0.15f; // m/s
     vx = std::clamp(vx, -MAX_SPEED, MAX_SPEED);
     vy = std::clamp(vy, -MAX_SPEED, MAX_SPEED);
 
@@ -76,6 +76,18 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
     if (phase_ >= 2.0 * M_PI) {
         phase_ = std::fmod(phase_, 2.0 * M_PI);
     }
+
+    // Rampa suave del factor de balanceo (sway_factor_) para evitar sacudidas
+    double target_sway = (active_.load() && walking) ? 1.0 : 0.0;
+    if (sway_factor_ < target_sway) {
+        sway_factor_ = std::min(target_sway, sway_factor_ + dt * SWAY_RAMP_RATE);
+    } else if (sway_factor_ > target_sway) {
+        sway_factor_ = std::max(target_sway, sway_factor_ - dt * SWAY_RAMP_RATE);
+    }
+
+    // Calcular el balanceo activo del cuerpo (Body Sway) en función de la fase
+    double dx_sway = -SWAY_AMPLITUDE_X * sway_factor_ * std::sin(2.0 * phase_);
+    double dy_sway = -SWAY_AMPLITUDE_Y * sway_factor_ * std::cos(phase_);
 
     // Longitud del paso en X e Y
     double Sx = vx * GAIT_PERIOD;
@@ -97,10 +109,10 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
         Leg* leg = legs[i];
         if (!leg) continue;
 
-        double leg_phase = std::fmod(phase_ + offsets[i], 2.0 * M_PI);
-        if (leg_phase < 0.0) leg_phase += 2.0 * M_PI;
+        double leg_phase = std::fmod(phase_ + offsets[i], 2.0 * M_PI); //resto de 2pi
+        if (leg_phase < 0.0) leg_phase += 2.0 * M_PI; //Correción de signo por seguridad
 
-        double x_rel = 0.0;
+        double x_rel = 0.0; //Se inicializan en posicion neutra de reposo para cada pata
         double y_rel = 0.0;
         double z_rel = 0.0;
 
@@ -121,8 +133,9 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
         // Obtener la posición neutra inicial (pose de levantado) en coordenadas del cuerpo
         Eigen::Vector3d p_neutral = leg->getInitialFootPosition();
         
-        // Sumar el desplazamiento relativo en coordenadas de cuerpo
-        Eigen::Vector3d p_body = p_neutral + Eigen::Vector3d(x_rel, y_rel, z_rel);
+        // Sumar el desplazamiento relativo en coordenadas de cuerpo y restar el desplazamiento del sway
+        // (ya que un movimiento del cuerpo hacia (+dx, +dy) desplaza el pie en (-dx, -dy) relativo al cuerpo)
+        Eigen::Vector3d p_body = p_neutral + Eigen::Vector3d(x_rel - dx_sway, y_rel - dy_sway, z_rel);
 
         // Comandar la pata usando el método encapsulado de cuerpo (con control directo sin filtro)
         leg->goToBodyPosition(p_body, STIFFNESS_Q1, STIFFNESS_Q2, STIFFNESS_Q3, true, true);
@@ -141,6 +154,7 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
 
         if (diff_0 < 0.15 || diff_half_pi < 0.15 || diff_pi < 0.15 || diff_1_5_pi < 0.15 || diff_2pi < 0.15) {
             phase_ = 0.0;
+            sway_factor_ = 0.0; // Resetear el factor de balanceo al estar parados
             for (int i = 0; i < 4; ++i) {
                 if (legs[i]) {
                     legs[i]->goToBodyPosition(legs[i]->getInitialFootPosition(), STIFFNESS_Q1, STIFFNESS_Q2, STIFFNESS_Q3, true, true);

@@ -55,11 +55,15 @@ private slots:
     // Slots para control IK de pata individual
     void sendCurrentIndividualLegTarget();
     void resetIndividualLegSliders();
+    void onComPortChanged(int index);
 
 private:
     Ui::MainWindow* ui;
     Tarantula*      robot_;
     QTimer*         timer_;
+
+    // Punteros para la barra de estado superior
+    QComboBox*   comboComPort_{nullptr};
 
     // Punteros para los botones del D-Pad dinámico (Cruz)
     QPushButton* btnTrotUp_{nullptr};

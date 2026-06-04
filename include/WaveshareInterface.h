@@ -34,6 +34,7 @@ public:
 
     bool connect();
     void close();
+    bool reconnectWithPort(const std::string& new_port);
     void send_can_frame(uint32_t can_id, const std::vector<uint8_t>& data_bytes);
 
     // Retorna true si hay trama, y llena can_id y data

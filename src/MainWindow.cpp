@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <thread>
+#include <iostream>
 
 static constexpr float RAD_TO_DEG = 180.0f / 3.14159265358979f;
 static constexpr float DEG_TO_RAD = 3.14159265358979f / 180.0f;
@@ -229,6 +230,37 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
 
     // Insertar este layout combinado horizontal justo debajo de las etiquetas de USB/CAN (índice 1 en verticalLayout_Right)
     ui->verticalLayout_Right->insertLayout(1, topHorizontalLayout);
+
+    // --- Configuración del selector de puerto COM ---
+    comboComPort_ = new QComboBox(this);
+    for (int i = 1; i <= 11; ++i) {
+        comboComPort_->addItem(QString("COM%1").arg(i));
+    }
+    
+    // Configurar estilo idéntico a otros combos y tamaño para que sea similar a lblUsbStatus (alto 40)
+    comboComPort_->setMinimumSize(85, 40);
+    comboComPort_->setMaximumSize(85, 40);
+    comboComPort_->setStyleSheet(
+        "QComboBox { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 3px; font-weight: bold; font-size: 13px; }"
+        "QComboBox QAbstractItemView { background-color: #1e1e2e; color: #cdd6f4; selection-background-color: #89b4fa; selection-color: #1e1e2e; }"
+    );
+    comboComPort_->setFocusPolicy(Qt::NoFocus);
+
+    // Insertar dinámicamente en el horizontalLayout_Status al lado de lblUsbStatus
+    int usb_idx = ui->horizontalLayout_Status->indexOf(ui->lblUsbStatus);
+    if (usb_idx != -1) {
+        ui->horizontalLayout_Status->insertWidget(usb_idx, comboComPort_);
+    } else {
+        ui->horizontalLayout_Status->addWidget(comboComPort_);
+    }
+
+    // Seleccionar COM3 por defecto (índice 2) bloqueando señales temporalmente
+    comboComPort_->blockSignals(true);
+    comboComPort_->setCurrentIndex(2);
+    comboComPort_->blockSignals(false);
+
+    // Conectar la señal de cambio
+    connect(comboComPort_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onComPortChanged);
 
     // Inicializar sliders con la posición real de la pata seleccionada por defecto
     resetIndividualLegSliders();
@@ -700,4 +732,13 @@ void MainWindow::resetIndividualLegSliders()
     lblLegX_->setText(QString("%1 mm").arg(x_mm));
     lblLegY_->setText(QString("%1 mm").arg(y_mm));
     lblLegZ_->setText(QString("%1 mm").arg(z_mm));
+}
+
+void MainWindow::onComPortChanged(int index)
+{
+    QString port_name = QString("\\\\.\\COM%1").arg(index + 1);
+    std::cout << "🔌 Solicitando reconexión serial a: " << port_name.toStdString() << "\n";
+    if (g_comm) {
+        g_comm->reconnectWithPort(port_name.toStdString());
+    }
 }
