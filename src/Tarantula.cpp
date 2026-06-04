@@ -31,10 +31,10 @@ Tarantula::~Tarantula()
 
 void Tarantula::createLegs()
 {
-    legs_[0] = new Leg(1, -M_PI / 4.0);
-    legs_[1] = new Leg(2,  M_PI / 4.0);
-    legs_[2] = new Leg(3,  3.0 * M_PI / 4.0);
-    legs_[3] = new Leg(4, -3.0 * M_PI / 4.0);
+    legs_[0] = new Leg(1,  M_PI / 4.0, this);
+    legs_[1] = new Leg(2, -M_PI / 4.0, this);
+    legs_[2] = new Leg(3, -3.0 * M_PI / 4.0, this);
+    legs_[3] = new Leg(4,  3.0 * M_PI / 4.0, this);
 }
 
 void Tarantula::start()
@@ -80,10 +80,10 @@ void Tarantula::disableAllLegs()
     }
 }
 
-void Tarantula::moveLeg(int leg_id, double x, double y, double z)
+bool Tarantula::moveLeg(int leg_id, double x, double y, double z)
 {
-    if (leg_id < 1 || leg_id > 4) return;
-    legs_[leg_id - 1]->goToPosition(x, y, z);
+    if (leg_id < 1 || leg_id > 4) return false;
+    return legs_[leg_id - 1]->goToPosition(x, y, z);
 }
 
 void Tarantula::moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness)
@@ -92,19 +92,28 @@ void Tarantula::moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness
     legs_[leg_id - 1]->moveJoint(joint, pos_deg, stiffness);
 }
 
-void Tarantula::setBodyPose(double dx, double dy, double dz,
+bool Tarantula::setBodyPose(double dx, double dy, double dz,
                             double roll, double pitch, double yaw)
 {
     if (!feet_captured_) {
         captureFeetPositions();
     }
 
-    int s1 = 3, s2 = 4, s3 = 4; //rigidez predeterminada
-
+    // Comprobar si la postura propuesta es realizable para todas las patas
+    std::array<Eigen::Vector3d, 4> targets;
     for (int i = 0; i < 4; ++i) {
-        Eigen::Vector3d local_target = legs_[i]->computeFootTarget(dx, dy, dz, roll, pitch, yaw);
-        legs_[i]->goToPosition(local_target.x(), local_target.y(), local_target.z(), s1, s2, s3);
+        targets[i] = legs_[i]->computeFootTarget(dx, dy, dz, roll, pitch, yaw);
+        if (!legs_[i]->isLocalPositionIKValid(targets[i], true)) {
+            return false; // Abortar si alguna pata no puede alcanzar la posición o colisiona
+        }
     }
+
+    // Aplicar movimiento
+    int s1 = 3, s2 = 4, s3 = 4;
+    for (int i = 0; i < 4; ++i) {
+        legs_[i]->goToPosition(targets[i].x(), targets[i].y(), targets[i].z(), s1, s2, s3);
+    }
+    return true;
 }
 
 void Tarantula::resetBodyPoseReference()
@@ -147,7 +156,7 @@ void Tarantula::runStandUpSequence()
 
     for (Leg* leg : legs_) {
         leg->moveJoint(1, 0.0f, 3);
-        leg->moveJoint(2, 24.0f, 4);
+        leg->moveJoint(2, 20.0f, 5);
         leg->moveJoint(3, -100.0f, 4);
     }
 
@@ -264,9 +273,33 @@ void Tarantula::tickAllLegs(uint64_t cycle_count)
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
 
+    // Actualizar el control del trote diagonal en tiempo real
+    gait_controller_.tick(legs_, now_ms);
+
     for (Leg* leg : legs_) {
         if (leg) leg->tick(now_ms, cycle_count);
     }
+}
+
+void Tarantula::setGaitVelocity(float vx, float vy)
+{
+    gait_controller_.setVelocity(vx, vy);
+}
+
+void Tarantula::startGait()
+{
+    abortSequence(); // Abortar cualquier secuencia de levantarse/acostarse activa
+    gait_controller_.start();
+}
+
+void Tarantula::stopGait()
+{
+    gait_controller_.stop();
+}
+
+bool Tarantula::isGaitActive() const
+{
+    return gait_controller_.isActive();
 }
 
 

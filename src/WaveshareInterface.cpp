@@ -53,6 +53,18 @@ void WaveshareInterface::close() {
     }
 }
 
+bool WaveshareInterface::reconnectWithPort(const std::string& new_port) {
+    std::cout << "🔄 Solicitando cambio de puerto a " << new_port << "...\n";
+    close();
+    
+    // Eliminar el puerto anterior y crear uno nuevo de manera segura
+    delete serial;
+    port = new_port;
+    serial = new SimpleSerial(port, baud);
+    
+    return connect();
+}
+
 uint8_t WaveshareInterface::calculate_checksum(const std::vector<uint8_t>& payload) {
     
     //calcula checksum (suma de verificación final)

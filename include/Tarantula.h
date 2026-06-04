@@ -6,6 +6,7 @@
 #include <chrono>
 #include "Leg.h"
 #include "WaveshareInterface.h"
+#include "GaitController.h"
 #include <Eigen/Dense>
 
 extern const double SEND_FREQUENCY;
@@ -22,15 +23,20 @@ public:
     void enableAllLegs();   
     void disableAllLegs();  
 
-    void moveLeg(int leg_id, double x, double y, double z); 
+    bool moveLeg(int leg_id, double x, double y, double z); 
     void moveLegJoint(int leg_id, int joint, float pos_deg, int stiffness);
 
-    void setBodyPose(double dx, double dy, double dz, double roll, double pitch, double yaw = 0.0);
+    bool setBodyPose(double dx, double dy, double dz, double roll, double pitch, double yaw = 0.0);
     void resetBodyPoseReference();
 
     void standUp();
     void sitDown();
     void abortSequence();  
+
+    void setGaitVelocity(float vx, float vy);
+    void startGait();
+    void stopGait();
+    bool isGaitActive() const;
 
     Leg& getLeg(int leg_id);                 
     bool isAnyMotorOnline() const;
@@ -46,6 +52,7 @@ private:
     std::thread       rx_thread_;
     std::thread       control_thread_;
     std::atomic<bool> sequence_active_{ false };
+    GaitController    gait_controller_;
 
     void rxLoop();
     void controlLoop();

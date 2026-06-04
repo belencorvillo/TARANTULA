@@ -179,6 +179,7 @@ void MotorController::applyStiffness(int stiffness)
 std::pair<float, float> MotorController::stiffnessToGains(int stiffness)
 {
     switch (stiffness) {
+
     case 1:  return {  5.0f, 0.5f };
     case 2:  return { 10.0f, 0.8f };
     case 3:  return { 15.0f, 1.2f };
