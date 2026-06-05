@@ -308,6 +308,20 @@ void Leg::sendIdleToAllMotors()
 
 void Leg::handleCanFrame(uint32_t can_id, const std::vector<uint8_t>& data)
 {
+    if (can_id >= 1 && can_id <= 4) {
+        if (data.size() == 4) {
+            float z_val = 0.0f;
+            std::memcpy(&z_val, data.data(), 4);
+            last_known_hall_z_.store(z_val, std::memory_order_relaxed);
+            
+            // Si es la pata 1, imprimir los datos leídos por consola
+            if (leg_id_ == 1) {
+                std::cout << "[Pata 1] Sensor Hall Z: " << z_val << " uT\n";
+            }
+        }
+        return;
+    }
+
     uint8_t motor_id = can_id >> 5;
     int joint_idx = (motor_id % 10) - 1;
     if (joint_idx >= 0 && joint_idx < 3) {

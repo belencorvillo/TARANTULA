@@ -231,8 +231,14 @@ void Tarantula::rxLoop()
 void Tarantula::processIncomingFrames(uint32_t& can_id, std::vector<uint8_t>& data)
 {
     while (comm_.receive_can_frame(can_id, data)) {
-        uint8_t motor_id = can_id >> 5;
-        int leg_id = motor_id / 10;
+        int leg_id = -1;
+        if (can_id >= 1 && can_id <= 4) {
+            leg_id = can_id;
+        } else {
+            uint8_t motor_id = can_id >> 5;
+            leg_id = motor_id / 10;
+        }
+
         if (leg_id >= 1 && leg_id <= 4) {
             legs_[leg_id - 1]->handleCanFrame(can_id, data);
         }
