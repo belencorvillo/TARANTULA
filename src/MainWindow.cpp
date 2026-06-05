@@ -257,10 +257,14 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
     // Seleccionar COM3 por defecto (índice 2) bloqueando señales temporalmente
     comboComPort_->blockSignals(true);
     comboComPort_->setCurrentIndex(2);
-    comboComPort_->blockSignals(false);
-
     // Conectar la señal de cambio
     connect(comboComPort_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onComPortChanged);
+    comboComPort_->blockSignals(false);
+
+    // Configurar los nuevos límites de movimiento del chasis (X/Y: +/-120mm, Z: +/-140mm)
+    ui->sliderBodyX->setRange(-120, 120);
+    ui->sliderBodyY->setRange(-120, 120);
+    ui->sliderBodyZ->setRange(-140, 140);
 
     // Inicializar sliders con la posición real de la pata seleccionada por defecto
     resetIndividualLegSliders();

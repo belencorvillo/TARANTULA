@@ -91,4 +91,5 @@ private:
     void applyAngles(const JointAngles& angles, int stiffness_q1 = 3, int stiffness_q2 = 4, int stiffness_q3 = 4, bool direct = false);
 
     std::atomic<bool> last_command_was_ik_{false};
+    std::atomic<float> last_known_hall_z_{0.0f};
 };
