@@ -1,0 +1,115 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+def generate_range_with_zero_and_limits(lim, step_deg):
+    neg_part = np.arange(0, lim[0], -step_deg)[::-1]
+    pos_part = np.arange(0, lim[1], step_deg)
+    return np.radians(np.unique(np.concatenate([[lim[0]], neg_part, pos_part, [lim[1]]])))
+
+def calculate_workspace_nested_loops(L1, L2, L3, q1_lim, q2_lim, q3_lim, step_deg=5.0):
+    """
+    Calcula la nube de puntos del espacio de trabajo mediante barrido por bucles anidados.
+    
+    Parámetros:
+        L1, L2, L3 : Longitudes de los eslabones (mm)
+        q1_lim, q2_lim, q3_lim : Tuplas/Listas con los límites [mín, máx] en grados
+        step_deg : Resolución del barrido angular en grados
+    """
+    # 1. Generar los rangos angulares asegurando incluir el 0 y los límites exactos
+    q1_range = generate_range_with_zero_and_limits(q1_lim, step_deg)
+    q2_range = generate_range_with_zero_and_limits(q2_lim, step_deg)
+    q3_range = generate_range_with_zero_and_limits(q3_lim, step_deg)
+    
+    # 2. Inicializar listas para almacenar las coordenadas cartesianas
+    x_pts, y_pts, z_pts = [], [], []
+    
+    # 3. Tres bucles anidados para recorrer todas las combinaciones articulares
+    for q1 in q1_range:
+        for q2 in q2_range:
+            for q3 in q3_range:
+                # Ecuación de distancia radial proyectada en el plano horizontal local (r)
+                r = L1 + L2 * np.cos(q2) + L3 * np.cos(q2 + q3)
+                
+                # Ecuaciones de Cinemática Directa de la extremidad
+                x = r * np.cos(q1)
+                y = r * np.sin(q1)
+                z = L2 * np.sin(q2) + L3 * np.sin(q2 + q3)
+                
+                # Guardar el punto cartesiano calculado
+                x_pts.append(x)
+                y_pts.append(y)
+                z_pts.append(z)
+                
+    return np.array(x_pts), np.array(y_pts), np.array(z_pts)
+
+# --- Ejemplo de Uso y Visualización ---
+if __name__ == "__main__":
+    # Parámetros mecánicos de Tarantula
+    L1, L2, L3 = 80.0, 188.0, 211.0
+    q1_lim = [-94.0, 105.0]
+    q2_lim = [-122.0, 117.0]
+    q3_lim = [-157.0, 154.0]
+    
+    # Obtener nube de puntos con resolución de 5 grados
+    x, y, z = calculate_workspace_nested_loops(L1, L2, L3, q1_lim, q2_lim, q3_lim, step_deg=5.0)
+    
+    print(f"Total de puntos calculados: {len(x)}")
+    print(f"Límites calculados en la nube de puntos:")
+    print(f"  X: [{np.min(x):.2f}, {np.max(x):.2f}] mm")
+    print(f"  Y: [{np.min(y):.2f}, {np.max(y):.2f}] mm")
+    print(f"  Z: [{np.min(z):.2f}, {np.max(z):.2f}] mm")
+    
+    # Graficar en 3 paneles alineados en una sola fila con un eje dedicado para la barra de color
+    from matplotlib.gridspec import GridSpec
+    fig = plt.figure(figsize=(16, 5.2))
+    fig.patch.set_facecolor('white')
+    
+    # GridSpec con 4 columnas (3 para los gráficos, 1 estrecha para la barra de color)
+    gs = GridSpec(1, 4, width_ratios=[1, 1, 1, 0.04], wspace=0.45)
+    ax_xy = fig.add_subplot(gs[0])
+    ax_xz = fig.add_subplot(gs[1])
+    ax_yz = fig.add_subplot(gs[2])
+    cax = fig.add_subplot(gs[3])
+    
+    # 1. Proyección X-Y (Vista Superior)
+    sc_xy = ax_xy.scatter(x, y, c=z, cmap='viridis', s=0.15, alpha=0.15)
+    ax_xy.set_xlabel('Eje X (mm)', fontsize=10)
+    ax_xy.set_ylabel('Eje Y (mm)', fontsize=10, labelpad=5)
+    ax_xy.set_title('(a) Vista Superior (Plano X-Y)', fontweight='bold', fontsize=11)
+    ax_xy.grid(True, linestyle=':', alpha=0.6)
+    ax_xy.axis('equal')
+    ax_xy.axvline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    ax_xy.axhline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    
+    # 2. Proyección X-Z (Vista Lateral/Sagital)
+    sc_xz = ax_xz.scatter(x, z, c=z, cmap='viridis', s=0.15, alpha=0.15)
+    ax_xz.set_xlabel('Eje X (mm)', fontsize=10)
+    ax_xz.set_ylabel('Eje Z (mm)', fontsize=10, labelpad=5)
+    ax_xz.set_title('(b) Vista Sagital (Plano X-Z)', fontweight='bold', fontsize=11)
+    ax_xz.grid(True, linestyle=':', alpha=0.6)
+    ax_xz.axis('equal')
+    ax_xz.axvline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    ax_xz.axhline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    
+    # 3. Proyección Y-Z (Vista Frontal)
+    sc_yz = ax_yz.scatter(y, z, c=z, cmap='viridis', s=0.15, alpha=0.15)
+    ax_yz.set_xlabel('Eje Y (mm)', fontsize=10)
+    ax_yz.set_ylabel('Eje Z (mm)', fontsize=10, labelpad=5)
+    ax_yz.set_title('(c) Vista Frontal (Plano Y-Z)', fontweight='bold', fontsize=11)
+    ax_yz.grid(True, linestyle=':', alpha=0.6)
+    ax_yz.axis('equal')
+    ax_yz.axvline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    ax_yz.axhline(0, color='#64748b', linestyle='--', linewidth=0.8)
+    
+    # Dibujar la barra de color en el eje dedicado cax
+    cbar = fig.colorbar(sc_yz, cax=cax)
+    cbar.set_label('Altura Z (mm)', rotation=90, labelpad=10, fontsize=10)
+    cbar.outline.set_linewidth(0.8)
+    cbar.outline.set_color('#cbd5e1')
+    
+    # Ajustar manualmente el espaciado para evitar que tight_layout interfiera con axis('equal')
+    fig.subplots_adjust(left=0.08, right=0.92, wspace=0.45, bottom=0.15, top=0.85)
+    fig.savefig('espacio_trabajo_proyecciones_2d.png', dpi=300, bbox_inches='tight')
+    fig.savefig('espacio_trabajo_proyecciones_2d.pdf', format='pdf', bbox_inches='tight')
+    print("Gráficas exportadas con éxito como 'espacio_trabajo_proyecciones_2d.png' y 'espacio_trabajo_proyecciones_2d.pdf'.")
+    plt.show()

@@ -24,6 +24,8 @@ add_executable(TARANTULA_UI
     include/Leg.h
     src/Tarantula.cpp
     include/Tarantula.h
+    src/Tests.cpp
+    include/Tests.h
     src/SimpleSerial.cpp
     include/SimpleSerial.h
     src/SteadyWinMotor.cpp

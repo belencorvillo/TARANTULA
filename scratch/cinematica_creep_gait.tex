@@ -1,0 +1,170 @@
+% =========================================================================
+% TFG - Subsección: Cinemática y Control del Paso de Arrastre (Creep Gait)
+% =========================================================================
+
+\subsection{Modelado Cinemático de la Marcha de Arrastre (\textit{Creep Gait})}
+\label{subsec:creep_gait_kinematics}
+
+La marcha de arrastre o \textit{creep gait} es un patrón de locomoción periódica caracterizado por su estabilidad estática. En cualquier instante de tiempo $t$, al menos tres extremidades del robot cuadrúpedo permanecen en contacto firme con el terreno (fase de apoyo o \textit{stance}), definiendo un triángulo de soporte o polígono de sustentación variable. Simultáneamente, a lo sumo una extremidad realiza la transición en el aire (fase de vuelo o \textit{swing}) para avanzar el paso. La condición fundamental de estabilidad estática exige que la proyección vertical del centro de masas (CoM) del chasis se ubique estrictamente en el interior del polígono de sustentación activo.
+
+\subsubsection{Fases del Ciclo y Desfases de las Extremidades}
+
+El periodo completo de la marcha se denota por $T$ (configurado en el controlador en $T = 4.0\text{ s}$). El factor de servicio (\textit{duty factor}) de cada pata es $\beta = 0.75$, lo que implica que cada extremidad pasa el $75\%$ del ciclo en apoyo y el $25\%$ restante en vuelo. La secuencia de oscilación ordenada de las patas para optimizar la estabilidad estática sigue la secuencia:
+\begin{equation}
+    \text{P0 (RF)} \longrightarrow \text{P2 (BL)} \longrightarrow \text{P1 (FL)} \longrightarrow \text{P3 (BR)}
+\end{equation}
+donde RF, FL, BL y BR representan las extremidades anterior-derecha, anterior-izquierda, posterior-izquierda y posterior-derecha, respectivamente. Denotando la fase global de la marcha como $\phi(t) = \omega t \pmod{2\pi}$, donde la frecuencia angular es $\omega = 2\pi / T$, la fase local $\phi_i(t)$ para cada extremidad $i \in \{0, 1, 2, 3\}$ se define introduciendo un desfase $\theta_i$:
+\begin{equation}
+    \phi_i(t) = (\phi(t) + \theta_i) \pmod{2\pi}
+\end{equation}
+Los valores de los desfases angulares $\theta_i$ se parametrizan en el firmware de la siguiente forma:
+\begin{equation}
+    \theta_0 = 0 \quad (\text{RF}), \qquad \theta_1 = \pi \quad (\text{FL}), \qquad \theta_2 = \frac{3\pi}{2} \quad (\text{BL}), \qquad \theta_3 = \frac{\pi}{2} \quad (\text{BR})
+\end{equation}
+De este modo, una extremidad $i$ se encuentra en fase de vuelo (\textit{swing}) si $\phi_i(t) \in [0, \frac{\pi}{2})$, y en fase de apoyo (\textit{stance}) si $\phi_i(t) \in [\frac{\pi}{2}, 2\pi)$.
+
+\subsubsection{Parametrización de las Trayectorias de los Pies}
+
+Dado un vector de velocidad de consigna para el chasis $\mathbf{v} = [v_x, v_y]^T$, las longitudes teóricas del paso en los ejes horizontales se determinan como $S_x = v_x T$ y $S_y = v_y T$. Para cada extremidad, su trayectoria espacial relativa a su posición neutra de reposo $\mathbf{p}_{\text{neutral}, i} = [x_{0,i}, y_{0,i}, z_{0,i}]^T$ se formula en base a su fase local $\phi_i$:
+
+\begin{enumerate}
+    \item \textbf{Trayectoria de Vuelo} ($\phi_i \in [0, \frac{\pi}{2})$): Definimos el parámetro normalizado de progresión en vuelo $\sigma_i = \frac{2\phi_i}{\pi} \in [0, 1)$. La trayectoria describe una interpolación lineal en el plano horizontal y un arco semisinusoidal en el eje vertical:
+    \begin{align}
+        x_{\text{rel}, i}(t) &= -\frac{S_x}{2} + S_x \sigma_i \\
+        y_{\text{rel}, i}(t) &= -\frac{S_y}{2} + S_y \sigma_i \\
+        z_{\text{rel}, i}(t) &= H_{\text{swing}} \sin(\pi \sigma_i)
+    \end{align}
+    donde $H_{\text{swing}} = 0.05\text{ m}$ representa la altura máxima de elevación del pie.
+
+    \item \textbf{Trayectoria de Apoyo} ($\phi_i \in [\frac{\pi}{2}, 2\pi)$): Definimos el parámetro de progresión de apoyo $\sigma_{i,s} = \frac{2\phi_i - \pi}{3\pi} \in [0, 1)$. El pie retrocede linealmente respecto al chasis para impulsar el cuerpo hacia adelante:
+    \begin{align}
+        x_{\text{rel}, i}(t) &= \frac{S_x}{2} - S_x \sigma_{i,s} \\
+        y_{\text{rel}, i}(t) &= \frac{S_y}{2} - S_y \sigma_{i,s} \\
+        z_{\text{rel}, i}(t) &= 0
+    \end{align}
+\end{enumerate}
+
+\subsubsection{Desplazamiento Oscilatorio del Cuerpo (\textit{Active Body Sway})}
+
+Para evitar la pérdida de equilibrio durante la elevación de cada pata, el controlador ejecuta un balanceo activo del chasis (\textit{body sway}) que desplaza lateral y longitudinalmente el CoM hacia el baricentro del triángulo de soporte activo. El desplazamiento del cuerpo $\boldsymbol{\Delta}_{\text{sway}} = [\Delta x_{\text{sway}}, \Delta y_{\text{sway}}]^T$ se calcula dinámicamente como:
+\begin{align}
+    \Delta x_{\text{sway}}(t) &= -A_{\text{sway}, x} \cdot k_{\text{sway}} \cdot \sin(2\phi(t)) \\
+    \Delta y_{\text{sway}}(t) &= -A_{\text{sway}, y} \cdot k_{\text{sway}} \cdot \cos(\phi(t))
+\end{align}
+donde $A_{\text{sway}, x} = A_{\text{sway}, y} = 0.05\text{ m}$ son las amplitudes del balanceo y $k_{\text{sway}} \in [0, 1]$ es un factor de rampa suave que atenúa el balanceo al iniciar o detener la marcha para evitar sacudidas mecánicas. 
+
+Finalmente, la posición objetivo del pie de la extremidad $i$ expresada en coordenadas del cuerpo $\mathbf{p}_{\text{body}, i} = [x_{b,i}, y_{b,i}, z_{b,i}]^T$ se obtiene superponiendo la trayectoria del pie y compensando el desplazamiento del chasis:
+\begin{equation}
+    \mathbf{p}_{\text{body}, i}(t) = \mathbf{p}_{\text{neutral}, i} + \begin{bmatrix}
+        x_{\text{rel}, i}(t) - \Delta x_{\text{sway}}(t) \\
+        y_{\text{rel}, i}(t) - \Delta y_{\text{sway}}(t) \\
+        z_{\text{rel}, i}(t)
+    \end{bmatrix}
+\end{equation}
+Este vector $\mathbf{p}_{\text{body}, i}(t)$ es el dato de entrada para el algoritmo de cinemática inversa local que calcula los ángulos de consigna de las articulaciones $\mathbf{q}_i = [q_{1,i}, q_{2,i}, q_{3,i}]^T$.
+
+% =========================================================================
+% Figura TikZ del Creep Gait (Cronograma y Polígono de Sustentación)
+% =========================================================================
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=0.85]
+  % -------------------------------------------------------------
+  % LADO IZQUIERDO: Cronograma de Marcha
+  % -------------------------------------------------------------
+  \begin{scope}[shift={(0,0)}]
+    % Eje horizontal
+    \draw[->, thick] (0,0) -- (6.5,0) node[right] {\small $\phi$ (rad)};
+    
+    % Divisiones del eje X
+    \foreach \x/\label in {0/{0}, 1.5/{$\frac{\pi}{2}$}, 3.0/{$\pi$}, 4.5/{$\frac{3\pi}{2}$}, 6.0/{{$2\pi$}}} {
+      \draw (\x, -0.08) -- (\x, 0.08);
+      \node[below, yshift=-2pt] at (\x, 0) {\scriptsize \label};
+    }
+    
+    % Líneas verticales discontinuas divisorias
+    \foreach \x in {1.5, 3.0, 4.5, 6.0} {
+      \draw[dashed, gray!40] (\x, 0) -- (\x, 3.4);
+    }
+    
+    % Pata 0 (RF) - Vuelo en [0, PI/2)
+    \node[left] at (-0.2, 3.0) {\scriptsize \textbf{P0 (RF)}};
+    \draw[fill=red!20, draw=red, thick] (0, 2.8) rect (1.5, 3.2) node[pos=0.5] {\tiny Vuelo};
+    \draw[fill=blue!10, draw=blue!60] (1.5, 2.8) rect (6.0, 3.2) node[pos=0.5] {\tiny Apoyo};
+    
+    % Pata 2 (BL) - Vuelo en [PI/2, PI)
+    \node[left] at (-0.2, 2.1) {\scriptsize \textbf{P2 (BL)}};
+    \draw[fill=blue!10, draw=blue!60] (0, 1.9) rect (1.5, 2.3);
+    \draw[fill=red!20, draw=red, thick] (1.5, 1.9) rect (3.0, 2.3) node[pos=0.5] {\tiny Vuelo};
+    \draw[fill=blue!10, draw=blue!60] (3.0, 1.9) rect (6.0, 2.3);
+    \node[blue!70!black] at (4.5, 2.1) {\tiny Apoyo};
+    
+    % Pata 1 (FL) - Vuelo en [PI, 3*PI/2)
+    \node[left] at (-0.2, 1.2) {\scriptsize \textbf{P1 (FL)}};
+    \draw[fill=blue!10, draw=blue!60] (0, 1.0) rect (3.0, 1.4) node[pos=0.5] {\tiny Apoyo};
+    \draw[fill=red!20, draw=red, thick] (3.0, 1.0) rect (4.5, 1.4) node[pos=0.5] {\tiny Vuelo};
+    \draw[fill=blue!10, draw=blue!60] (4.5, 1.0) rect (6.0, 1.4);
+    
+    % Pata 3 (BR) - Vuelo en [3*PI/2, 2*PI)
+    \node[left] at (-0.2, 0.3) {\scriptsize \textbf{P3 (BR)}};
+    \draw[fill=blue!10, draw=blue!60] (0, 0.1) rect (4.5, 0.5) node[pos=0.5] {\tiny Apoyo};
+    \draw[fill=red!20, draw=red, thick] (4.5, 0.1) rect (6.0, 0.5) node[pos=0.5] {\tiny Vuelo};
+    
+    \node[below, align=center] at (3.0, -0.8) {\small (a) Cronograma de Fases del Ciclo};
+  \end{scope}
+  
+  % -------------------------------------------------------------
+  % LADO DERECHO: Polígono de Sustentación y Body Sway
+  % -------------------------------------------------------------
+  \begin{scope}[shift={(10.0,1.7)}]
+    % Ejes del chasis
+    \draw[->, gray!30] (-2.2,0) -- (2.2,0) node[right] {\tiny $X_B$};
+    \draw[->, gray!30] (0,-2.2) -- (0,2.2) node[above] {\tiny $Y_B$};
+    
+    % Dibujo del chasis
+    \draw[fill=gray!10, draw=black, thick, rounded corners=6pt] (-1.0,-1.0) rectangle (1.0,1.0);
+    \node[below] at (0,-1.0) {\scriptsize Chasis};
+    
+    % Polígono de sustentación formado por P1, P2 y P3 (cuando P0 está en el aire)
+    \draw[fill=green!15, draw=green!60!black, dashed, thick] (-1.7, 1.7) -- (-1.7, -1.7) -- (1.7, -1.7) -- cycle;
+    \node[green!50!black, align=center] at (-0.8, -0.6) {\tiny Polígono\\ \tiny de Apoyo};
+    
+    % Patas en Apoyo (P1, P2, P3)
+    \draw[fill=blue!60, draw=black] (-1.7, 1.7) circle (0.12) node[above left] {\tiny P1(FL)};
+    \draw[fill=blue!60, draw=black] (-1.7, -1.7) circle (0.12) node[below left] {\tiny P2(BL)};
+    \draw[fill=blue!60, draw=black] (1.7, -1.7) circle (0.12) node[below right] {\tiny P3(BR)};
+    
+    % Pata en Vuelo (P0)
+    \draw[fill=red!40, draw=red, dashed, thick] (1.7, 1.7) circle (0.12) node[above right] {\tiny P0(RF)};
+    \draw[red, ->, >=stealth, bend left=15] (1.4, 1.1) to (1.9, 1.9);
+    
+    % Eslabones (esquemáticos)
+    \draw[thick] (-0.7, 0.7) -- (-1.7, 1.7);
+    \draw[thick] (-0.7, -0.7) -- (-1.7, -1.7);
+    \draw[thick] (0.7, -0.7) -- (1.7, -1.7);
+    \draw[thick, dashed, red!60] (0.7, 0.7) -- (1.7, 1.7);
+    
+    % Centro geométrico
+    \draw[fill=black] (0,0) circle (0.05);
+    
+    % Órbita del Body Sway (Trayectoria del CoM)
+    \draw[dotted, blue!70!black, thick] plot[domain=0:360, samples=60] ({0.4*sin(2*\x)}, {0.4*cos(\x)});
+    \node[blue!70!black, above] at (0.2, 0.4) {\tiny Trayectoria CoM};
+    
+    % Desplazamiento actual (CoM desplazado hacia el triángulo de apoyo en el tercer cuadrante)
+    \begin{scope}[shift={(-0.35,-0.35)}]
+      \draw[fill=white] (0,0) circle (0.16);
+      \draw[fill=black] (0,0) -- (0,0.16) arc (90:180:0.16) -- cycle;
+      \draw[fill=black] (0,0) -- (0,-0.16) arc (270:360:0.16) -- cycle;
+      \node[below left, xshift=-1pt] at (0, 0) {\tiny CoM};
+    \end{scope}
+    
+    % Vector de desplazamiento del CoM
+    \draw[->, red, thick, >=stealth] (0,0) -- (-0.35, -0.35) node[midway, above left, xshift=2pt, yshift=2pt] {\tiny $\boldsymbol{\Delta}_{\text{sway}}$};
+    
+    \node[below, align=center] at (0, -2.5) {\small (b) Estabilización por \textit{Body Sway}};
+  \end{scope}
+\end{tikzpicture}
+\caption{Modelado y estabilidad del paso de arrastre (\textit{Creep Gait}). (a) Representación temporal del ciclo indicando los periodos de vuelo y apoyo. (b) Vista superior del robot durante la elevación de la pata anterior derecha (P0), ilustrando cómo el desplazamiento de control $\boldsymbol{\Delta}_{\text{sway}}$ desplaza el centro de masas (CoM) hacia el centro geométrico del triángulo de apoyo activo (P1-P2-P3).}
+\label{fig:creep_gait_model}
+\end{figure}

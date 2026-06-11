@@ -125,6 +125,19 @@ float Leg::getJointAngle(int joint) const
            * static_cast<float>(180.0 / M_PI);
 }
 
+float Leg::getJointTarget(int joint) const
+{
+    if (joint < 1 || joint > 3) return 0.0f;
+    return motor_[joint - 1].target_pos.load(std::memory_order_relaxed)
+           * static_cast<float>(180.0 / M_PI);
+}
+
+float Leg::getJointTorque(int joint) const
+{
+    if (joint < 1 || joint > 3) return 0.0f;
+    return motor_[joint - 1].last_known_torque.load(std::memory_order_relaxed);
+}
+
 
 Eigen::Vector3d Leg::getCurrentFootPosition() const
 {
@@ -338,6 +351,9 @@ void Leg::handleCanFrame(uint32_t can_id, const std::vector<uint8_t>& data)
                 ctrl.update_from_mit_frame();
             } else if (cmd == MW_GET_ENCODER_ESTIMATES_CMD) {
                 ctrl.update_from_encoder_frame();
+            } else if (cmd == MW_GET_TORQUES_CMD) {
+                float phys_torque = ctrl.motorData.torques.torque;
+                ctrl.last_known_torque.store(ctrl.convert_dir(phys_torque), std::memory_order_relaxed);
             }
         }
     }

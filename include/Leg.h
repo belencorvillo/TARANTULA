@@ -58,6 +58,8 @@ public:
    
     bool  isGrounded()             const;  // para cuando implemente los sensores de efecto Hall
     float getJointAngle(int joint) const;  
+    float getJointTarget(int joint) const;
+    float getJointTorque(int joint) const;
     Eigen::Vector3d getCurrentFootPosition() const; // con cinemática directa
 
     

@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "Tarantula.h"
+#include "Tests.h"
 #include "MotorController.h"
 #include <QTableWidgetItem>
 #include <QGroupBox>
@@ -10,6 +11,7 @@
 #include <QSlider>
 #include <QLabel>
 #include <QMessageBox>
+#include <QLineEdit>
 #include <thread>
 #include <iostream>
 
@@ -195,6 +197,24 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
     btnResetLeg_->setFocusPolicy(Qt::NoFocus);
     legIkLayout->addWidget(btnResetLeg_, 4, 1, 1, 2);
 
+    // Botón Dibujar Círculo
+    btnValidateIk_ = new QPushButton("Dibujar Círculo", this);
+    btnValidateIk_->setStyleSheet(
+        "QPushButton { background-color: #313244; color: #89b4fa; border: 2px solid #45475a; border-radius: 6px; padding: 4px; font-weight: bold; }"
+        "QPushButton:pressed { background-color: #89b4fa; color: #1e1e2e; }"
+    );
+    btnValidateIk_->setFocusPolicy(Qt::NoFocus);
+    legIkLayout->addWidget(btnValidateIk_, 5, 1, 1, 2);
+
+    // Botón Repetibilidad ISO 9283
+    btnRepeatability_ = new QPushButton("Repetibilidad ISO 9283", this);
+    btnRepeatability_->setStyleSheet(
+        "QPushButton { background-color: #313244; color: #a6e3a1; border: 2px solid #45475a; border-radius: 6px; padding: 4px; font-weight: bold; }"
+        "QPushButton:pressed { background-color: #a6e3a1; color: #1e1e2e; }"
+    );
+    btnRepeatability_->setFocusPolicy(Qt::NoFocus);
+    legIkLayout->addWidget(btnRepeatability_, 6, 1, 1, 2);
+
     // Conectar señales del panel de pata individual
     connect(comboLegSelect_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::resetIndividualLegSliders);
     connect(sliderLegX_, &QSlider::valueChanged, this, &MainWindow::sendCurrentIndividualLegTarget);
@@ -218,12 +238,102 @@ MainWindow::MainWindow(Tarantula* robot, QWidget* parent)
         }
     });
 
+    connect(btnValidateIk_, &QPushButton::clicked, [this]() {
+        if (comboLegSelect_) {
+            int leg_idx = comboLegSelect_->currentIndex();
+            int leg_id = leg_idx + 1;
+            robot_->tests().startCircleIKValidation(leg_id);
+        }
+    });
+
+    connect(btnRepeatability_, &QPushButton::clicked, [this]() {
+        if (comboLegSelect_) {
+            int leg_idx = comboLegSelect_->currentIndex();
+            int leg_id = leg_idx + 1;
+            robot_->tests().startISO9283Repeatability(leg_id);
+        }
+    });
+
+    // Re-posicionar btnResetPose programáticamente para hacer espacio al nuevo botón del cuerpo
+    if (ui->btnResetPose) {
+        ui->btnResetPose->setGeometry(30, 480, 160, 40);
+        
+        btnCircleBody_ = new QPushButton("Círculo Cuerpo", this);
+        btnCircleBody_->setGeometry(210, 480, 160, 40);
+        btnCircleBody_->setStyleSheet(
+            "QPushButton { background-color: #313244; color: #f5c2e7; border: 2px solid #f5c2e7; border-radius: 6px; padding: 8px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #f5c2e7; color: #1e1e2e; }"
+        );
+        btnCircleBody_->setParent(ui->btnResetPose->parentWidget());
+        btnCircleBody_->setFocusPolicy(Qt::NoFocus);
+        btnCircleBody_->show();
+
+        connect(btnCircleBody_, &QPushButton::clicked, [this]() {
+            robot_->tests().startBodyCircleValidation();
+        });
+    }
+
+    // --- Configuración de Telemetría ---
+    QGroupBox* telemetryGroup = new QGroupBox("Telemetría", this);
+    telemetryGroup->setStyleSheet(
+        "QGroupBox { color: #f5c2e7; font-weight: bold; border: 2px solid #313244; border-radius: 6px; padding: 10px; }"
+    );
+    telemetryGroup->setMinimumWidth(260);
+    telemetryGroup->setMaximumWidth(320);
+
+    QGridLayout* telemetryLayout = new QGridLayout(telemetryGroup);
+    telemetryLayout->setSpacing(6);
+    telemetryLayout->setContentsMargins(5, 5, 5, 5);
+
+    QLabel* lblFilename = new QLabel("Archivo:", this);
+    lblFilename->setStyleSheet("color: #a6adc8; font-weight: bold;");
+
+    txtTelemetryFilename_ = new QLineEdit(this);
+    txtTelemetryFilename_->setText("telemetria_rigidez_3.csv");
+    txtTelemetryFilename_->setStyleSheet(
+        "QLineEdit { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 3px; }"
+    );
+
+    btnStartRec_ = new QPushButton("Grabar", this);
+    btnStartRec_->setStyleSheet(
+        "QPushButton { background-color: #313244; color: #a6e3a1; border: 2px solid #45475a; border-radius: 6px; padding: 4px; font-weight: bold; }"
+        "QPushButton:pressed { background-color: #a6e3a1; color: #1e1e2e; }"
+    );
+
+    btnStopRec_ = new QPushButton("Detener", this);
+    btnStopRec_->setEnabled(false);
+    btnStopRec_->setStyleSheet(
+        "QPushButton { background-color: #313244; color: #f38ba8; border: 2px solid #45475a; border-radius: 6px; padding: 4px; font-weight: bold; }"
+        "QPushButton:pressed { background-color: #f38ba8; color: #1e1e2e; }"
+        "QPushButton:disabled { color: #585b70; border-color: #313244; }"
+    );
+
+    lblTelemetryStatus_ = new QLabel("Estado: Inactivo", this);
+    lblTelemetryStatus_->setStyleSheet("color: #a6adc8; font-size: 11px;");
+
+    telemetryLayout->addWidget(lblFilename, 0, 0);
+    telemetryLayout->addWidget(txtTelemetryFilename_, 0, 1, 1, 2);
+    telemetryLayout->addWidget(btnStartRec_, 1, 0, 1, 2);
+    telemetryLayout->addWidget(btnStopRec_, 1, 2);
+    telemetryLayout->addWidget(lblTelemetryStatus_, 2, 0, 1, 3);
+
+    connect(btnStartRec_, &QPushButton::clicked, [this]() {
+        QString filename = txtTelemetryFilename_->text().trimmed();
+        if (filename.isEmpty()) filename = "telemetria.csv";
+        robot_->tests().startTelemetry(filename.toStdString());
+    });
+
+    connect(btnStopRec_, &QPushButton::clicked, [this]() {
+        robot_->tests().stopTelemetry();
+    });
+
     QHBoxLayout* topHorizontalLayout = new QHBoxLayout();
     topHorizontalLayout->setSpacing(15);
     topHorizontalLayout->setContentsMargins(0, 0, 0, 0);
     topHorizontalLayout->addLayout(actionButtonsLayout);
     topHorizontalLayout->addWidget(trotGroup);
     topHorizontalLayout->addWidget(legIkGroup);
+    topHorizontalLayout->addWidget(telemetryGroup);
 
     // Añadir un spacer horizontal a la derecha para que todo se agrupe de forma elegante a la izquierda
     topHorizontalLayout->addSpacerItem(new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum));
@@ -294,6 +404,23 @@ void MainWindow::updateUI()
     updateStatusLeds();
     updateMotorTable();
     updateSpiderWidget();
+
+    // Actualizar estado de la telemetria
+    if (lblTelemetryStatus_ && robot_ && btnStartRec_ && btnStopRec_ && txtTelemetryFilename_) {
+        if (robot_->tests().isTelemetryActive()) {
+            lblTelemetryStatus_->setText(QString("Grabando: %1 muestras").arg(robot_->tests().getTelemetrySampleCount()));
+            lblTelemetryStatus_->setStyleSheet("color: #a6e3a1; font-weight: bold;");
+            btnStartRec_->setEnabled(false);
+            btnStopRec_->setEnabled(true);
+            txtTelemetryFilename_->setEnabled(false);
+        } else {
+            lblTelemetryStatus_->setText("Estado: Inactivo");
+            lblTelemetryStatus_->setStyleSheet("color: #a6adc8;");
+            btnStartRec_->setEnabled(true);
+            btnStopRec_->setEnabled(false);
+            txtTelemetryFilename_->setEnabled(true);
+        }
+    }
 }
 
 void MainWindow::updateStatusLeds()

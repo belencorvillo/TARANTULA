@@ -9,6 +9,7 @@ class Tarantula;
 class QComboBox;
 class QSlider;
 class QLabel;
+class QLineEdit;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -80,6 +81,15 @@ private:
     QLabel*      lblLegY_{nullptr};
     QLabel*      lblLegZ_{nullptr};
     QPushButton* btnResetLeg_{nullptr};
+    QPushButton* btnValidateIk_{nullptr};
+    QPushButton* btnCircleBody_{nullptr};
+    QPushButton* btnRepeatability_{nullptr};
+
+    // Punteros para telemetria
+    QLineEdit*   txtTelemetryFilename_{nullptr};
+    QPushButton* btnStartRec_{nullptr};
+    QPushButton* btnStopRec_{nullptr};
+    QLabel*      lblTelemetryStatus_{nullptr};
 
     // Flags para rastrear la pulsación de teclas físicas de dirección
     bool keyUpPressed_{false};

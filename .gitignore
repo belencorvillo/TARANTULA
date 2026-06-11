@@ -29,3 +29,8 @@ Explicacion_Trapezoidal.txt
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Python cache & executables
+__pycache__/
+*.exe
+

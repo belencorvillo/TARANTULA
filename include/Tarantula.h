@@ -4,6 +4,10 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <fstream>
+#include <mutex>
+#include <string>
+#include <memory>
 #include "Leg.h"
 #include "WaveshareInterface.h"
 #include "GaitController.h"
@@ -11,6 +15,7 @@
 
 extern const double SEND_FREQUENCY;
 
+class Tests;
 
 class Tarantula {
 public:
@@ -42,7 +47,10 @@ public:
     bool isAnyMotorOnline() const;
     bool isRunning() const { return running_.load(); }
 
+    Tests& tests() const { return *tests_; }
+
 private:
+    friend class Tests;
    
     WaveshareInterface& comm_;
     std::array<Leg*, 4> legs_;  
@@ -73,4 +81,6 @@ private:
     // Sub-funciones del hilo de control
     bool isTimeForNextTick(const std::chrono::steady_clock::time_point& last) const;
     void tickAllLegs(uint64_t cycle_count);
+
+    std::unique_ptr<Tests> tests_;
 };

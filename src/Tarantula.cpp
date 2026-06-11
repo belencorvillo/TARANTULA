@@ -1,6 +1,7 @@
-    // feet_captured_ = false;  //esta variable la utilizarÃ© para cuando hago lo de la cinemÃ¡tica inversa// feet_captured_ = false;  //esta variable la utilizarÃ© para cuando hago lo de la cinemÃ¡tica inversa
+     // feet_captured_ = false;  //esta variable la utilizarÃ© para cuando hago lo de la cinemÃ¡tica inversa// feet_captured_ = false;  //esta variable la utilizarÃ© para cuando hago lo de la cinemÃ¡tica inversa
 #include "Tarantula.h"
 #include "Config.h"
+#include "Tests.h"
 #include <iostream>
 #include <cmath>
 #include <thread>
@@ -18,7 +19,7 @@ static const std::vector<uint32_t> MOTOR_IDS = {
 };
 
 Tarantula::Tarantula(WaveshareInterface& comm)
-    : comm_(comm)
+    : comm_(comm), tests_(std::make_unique<Tests>(*this))
 {
     createLegs();
 }
@@ -48,6 +49,7 @@ void Tarantula::start()
 
 void Tarantula::stop()
 {
+    tests_->stopTelemetry();
     sequence_active_.store(false);
     running_.store(false);
 
@@ -285,6 +287,7 @@ void Tarantula::tickAllLegs(uint64_t cycle_count)
     for (Leg* leg : legs_) {
         if (leg) leg->tick(now_ms, cycle_count);
     }
+    tests_->tickTelemetry();
 }
 
 void Tarantula::setGaitVelocity(float vx, float vy)
@@ -307,6 +310,8 @@ bool Tarantula::isGaitActive() const
 {
     return gait_controller_.isActive();
 }
+
+
 
 
 
