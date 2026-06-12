@@ -370,6 +370,11 @@ void MainWindow::updateSpiderWidget()
         float pos_rad = ctrl->last_known_pos.load(std::memory_order_relaxed);
         ui->spiderWidget->updateMotor(id, pos_rad, online);
     }
+
+    for (int leg_id = 1; leg_id <= 4; ++leg_id) {
+        bool grounded = robot_->getLeg(leg_id).isGrounded();
+        ui->spiderWidget->updateLegGrounded(leg_id, grounded);
+    }
 }
 
 
