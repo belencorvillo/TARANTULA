@@ -292,6 +292,11 @@ void Tarantula::setGaitVelocity(float vx, float vy)
     gait_controller_.setVelocity(vx, vy);
 }
 
+void Tarantula::setGaitType(int type)
+{
+    gait_controller_.setGaitType(static_cast<GaitController::GaitType>(type));
+}
+
 void Tarantula::startGait()
 {
     abortSequence(); // Abortar cualquier secuencia de levantarse/acostarse activa
