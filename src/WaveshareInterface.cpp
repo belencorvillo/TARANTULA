@@ -229,7 +229,7 @@ void WaveshareInterface::txLoop() {
         }
 
         // Iniciamos el temporizador antes de escribir en el puerto serie.
-        // Esto garantiza que el espaciado entre el inicio de dos tramas consecutivas sea exactamente de 1.0 ms,
+        // Esto garantiza que el espaciado entre el inicio de dos tramas consecutivas sea de al menos 1.0 ms,
         // absorbiendo el tiempo que tarde la escritura del driver de Windows en retornar.
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -237,12 +237,22 @@ void WaveshareInterface::txLoop() {
             serial->writeBytes(frame);
         }
 
-        // Pacing físico preciso de 1500 microsegundos (1.5 ms) desde el inicio del envío de la trama.
+        auto post_write = std::chrono::high_resolution_clock::now();
+
+        // Pacing físico con salvaguarda post-escritura (Estrategia A)
+        // Asegura un período de al menos 1000 us (1.0 ms) desde el inicio de la trama,
+        // pero garantiza un silencio mínimo de 500 us tras finalizar la escritura física para no saturar.
+        static constexpr int64_t TARGET_PACING_US = 1000;
+        static constexpr int64_t MIN_SILENCE_US = 500;
+
         // Usamos un spin-wait compatible con MSVC y MinGW GCC para evitar que el hilo ceda su turno (yield) y sea penalizado con 15ms de retraso.
         while (tx_running.load(std::memory_order_relaxed)) {
-            auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+            auto elapsed_total = std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::high_resolution_clock::now() - start).count();
-            if (elapsed >= 2000) {
+            auto elapsed_silence = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::high_resolution_clock::now() - post_write).count();
+
+            if (elapsed_total >= TARGET_PACING_US && elapsed_silence >= MIN_SILENCE_US) {
                 break;
             }
 #if defined(_MSC_VER)
