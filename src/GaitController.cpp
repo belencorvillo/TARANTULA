@@ -80,6 +80,8 @@ void GaitController::tick(std::array<Leg*, 4>& legs, int64_t now_ms)
         return;
     }
 
+
+
     // Avanzar la fase de la marcha
     double omega = (2.0 * M_PI) / GAIT_PERIOD;
     phase_ += omega * dt;

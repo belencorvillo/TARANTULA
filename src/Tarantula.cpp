@@ -279,8 +279,10 @@ void Tarantula::tickAllLegs(uint64_t cycle_count)
     auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
 
-    // Actualizar el control del trote diagonal en tiempo real
-    gait_controller_.tick(legs_, now_ms);
+    // Actualizar el control del trote diagonal en tiempo real únicamente si el robot está levantado (pies capturados)
+    if (feet_captured_) {
+        gait_controller_.tick(legs_, now_ms);
+    }
 
     for (Leg* leg : legs_) {
         if (leg) leg->tick(now_ms, cycle_count);
