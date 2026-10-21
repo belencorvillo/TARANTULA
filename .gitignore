@@ -34,3 +34,12 @@ Desktop.ini
 /include/Eigen/
 /sensores_hall/
 /context/
+/hardware/
+
+# Documentación privada y configuración del asistente IA (no se publican)
+CLAUDE.md
+/.claude/
+/brazo_continuo/
+
+# scripts
+/scripts/generar_presentacion.py
