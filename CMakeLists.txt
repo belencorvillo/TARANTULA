@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 COMPONENTS Widgets REQUIRED)
+find_package(Qt6 COMPONENTS Widgets Network REQUIRED)
 
 add_executable(TARANTULA_UI
     src/main.cpp
@@ -35,9 +35,11 @@ add_executable(TARANTULA_UI
     include/Config.h
     src/CanLogger.cpp
     include/CanLogger.h
+    src/WebServer.cpp
+    include/WebServer.h
 )
 
-target_link_libraries(TARANTULA_UI PRIVATE Qt6::Widgets)
+target_link_libraries(TARANTULA_UI PRIVATE Qt6::Widgets Qt6::Network)
 if(WIN32)
     target_link_libraries(TARANTULA_UI PRIVATE winmm)
 endif()
