@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarántula · Control</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='6' fill='%23f5c451'/%3E%3Cpath d='M11 12 4 5M21 12l7-7M11 20l-7 7M21 20l7 7' stroke='%23f5c451' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="importmap">
+    { "imports": {
+        "three": "./vendor/three/three.module.min.js",
+        "three/addons/": "./vendor/three/addons/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="5.5"/><path d="M11 12 4 5M21 12l7-7M11 20l-7 7M21 20l7 7"/></svg>
+      <span>TARÁNTULA</span>
+      <small>panel de control</small>
+    </div>
+
+    <div class="status">
+      <label class="port">
+        <span>Puerto</span>
+        <select id="selPort" title="Puerto COM del adaptador USB-CAN"></select>
+      </label>
+      <span class="pill" id="pillUsb"><i></i>USB</span>
+      <span class="pill" id="pillCan"><i></i>CAN</span>
+      <span class="pill" id="pillWs"><i></i><b id="wsText">Conectando…</b></span>
+    </div>
+
+    <div class="power">
+      <button class="btn btn-on" data-cmd="enableAll">Encender todos</button>
+      <button class="btn btn-off" data-cmd="disableAll">Apagar todos</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ===================== IZQUIERDA ===================== -->
+    <aside class="panel-col">
+      <section class="card">
+        <h2>Secuencias</h2>
+        <div class="row2">
+          <button class="btn btn-accent" data-cmd="standUp">Levantarse</button>
+          <button class="btn btn-violet" data-cmd="sitDown">Acostarse</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Marcha <span class="tag" id="gaitState">parada</span></h2>
+        <div class="seg" id="segGait" role="radiogroup" aria-label="Tipo de marcha">
+          <button role="radio" data-gait="0" aria-checked="true">Creep</button>
+          <button role="radio" data-gait="1" aria-checked="false">Trote alterno</button>
+        </div>
+        <div class="dpad" id="dpad" title="Mantén pulsado o usa las flechas del teclado">
+          <button data-key="up" aria-label="Adelante">▲</button>
+          <button data-key="left" aria-label="Izquierda">◀</button>
+          <span class="dpad-hub"><kbd>⌨</kbd></span>
+          <button data-key="right" aria-label="Derecha">▶</button>
+          <button data-key="down" aria-label="Atrás">▼</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Postura del cuerpo</h2>
+        <div class="sliders" id="bodySliders">
+          <label><span>X</span><input type="range" data-k="x" min="-120" max="120" value="0"><output>0 mm</output></label>
+          <label><span>Y</span><input type="range" data-k="y" min="-120" max="120" value="0"><output>0 mm</output></label>
+          <label><span>Z</span><input type="range" data-k="z" min="-140" max="140" value="0"><output>0 mm</output></label>
+          <label><span>Roll</span><input type="range" data-k="roll" min="-25" max="25" value="0"><output>0°</output></label>
+          <label><span>Pitch</span><input type="range" data-k="pitch" min="-25" max="25" value="0"><output>0°</output></label>
+          <label><span>Yaw</span><input type="range" data-k="yaw" min="-25" max="25" value="0"><output>0°</output></label>
+        </div>
+        <button class="btn btn-ghost wide" id="btnResetPose">Reset pose</button>
+      </section>
+    </aside>
+
+    <!-- ===================== VISOR 3D ===================== -->
+    <section class="viewport" id="viewport">
+      <div class="vp-overlay vp-top">
+        <div class="seg seg-sm" id="segSource" role="radiogroup" aria-label="Ángulos mostrados">
+          <button role="radio" data-src="cmd" aria-checked="true">Comandado</button>
+          <button role="radio" data-src="real" aria-checked="false">Real</button>
+        </div>
+        <span class="sim-badge" id="simBadge" hidden title="Los motores sin conectar se simulan: el gemelo 'Comandado' responde a las órdenes sin robot">SIMULACIÓN</span>
+        <button class="btn btn-ghost btn-sm" id="btnView" title="Restablecer cámara">⟲ Vista</button>
+      </div>
+      <div class="vp-loading" id="vpLoading">Cargando modelo…</div>
+      <div class="vp-legend">Arrastra para girar · rueda para zoom · clic en una pata para seleccionarla</div>
+      <div class="toasts" id="toasts" aria-live="polite"></div>
+    </section>
+
+    <!-- ===================== DERECHA ===================== -->
+    <aside class="panel-col">
+      <details class="card collapsible" id="ikPanel">
+        <summary><h2>Control IK de pata <span class="chev" aria-hidden="true">▾</span></h2></summary>
+        <div class="seg seg-legs" id="segLeg" role="radiogroup" aria-label="Pata">
+          <button role="radio" data-leg="1" aria-checked="true">1 <small>DD</small></button>
+          <button role="radio" data-leg="2" aria-checked="false">2 <small>DI</small></button>
+          <button role="radio" data-leg="3" aria-checked="false">3 <small>TI</small></button>
+          <button role="radio" data-leg="4" aria-checked="false">4 <small>TD</small></button>
+        </div>
+        <div class="sliders" id="legSliders">
+          <label><span>X</span><input type="range" data-k="x" min="200" max="495" value="495"><output>495 mm</output></label>
+          <label><span>Y</span><input type="range" data-k="y" min="-300" max="300" value="0"><output>0 mm</output></label>
+          <label><span>Z</span><input type="range" data-k="z" min="-350" max="150" value="0"><output>0 mm</output></label>
+        </div>
+        <button class="btn btn-ghost wide" id="btnLegNominal">Nominal / Sinc</button>
+      </details>
+
+      <section class="card">
+        <h2>Articulaciones <small>· las 4 patas</small></h2>
+        <table class="jt">
+          <thead><tr><th></th><th>q1</th><th>q2</th><th>q3</th></tr></thead>
+          <tbody>
+            <tr><th>Pos °</th>
+              <td><input type="number" id="jp1" value="0" step="1" aria-label="Posición q1"></td>
+              <td><input type="number" id="jp2" value="0" step="1" aria-label="Posición q2"></td>
+              <td><input type="number" id="jp3" value="0" step="1" aria-label="Posición q3"></td></tr>
+            <tr><th>Rig</th>
+              <td><input type="number" id="jr1" value="3" min="0" max="5" aria-label="Rigidez q1"></td>
+              <td><input type="number" id="jr2" value="3" min="0" max="5" aria-label="Rigidez q2"></td>
+              <td><input type="number" id="jr3" value="3" min="0" max="5" aria-label="Rigidez q3"></td></tr>
+          </tbody>
+        </table>
+        <button class="btn btn-primary wide" id="btnSendGrid">Enviar comando</button>
+      </section>
+
+      <section class="card">
+        <h2>Motor individual</h2>
+        <div class="mover">
+          <label><span>ID</span><select id="mvId"></select></label>
+          <label><span>Pos °</span><input type="number" id="mvPos" value="0" step="1"></label>
+          <label><span>Rig</span><input type="number" id="mvRig" value="3" min="0" max="5"></label>
+        </div>
+        <div class="row3">
+          <button class="btn btn-ghost btn-on" id="btnMvEnable">Encender</button>
+          <button class="btn btn-ghost btn-off-soft" id="btnMvDisable">Apagar</button>
+          <button class="btn btn-primary" id="btnMvSend">Enviar</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Motores <button class="btn btn-ghost btn-xs" id="btnResetLog" title="Vacía el fichero can_log.csv del CanLogger">↺ Reset log CAN</button></h2>
+        <div class="motors" id="motors"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

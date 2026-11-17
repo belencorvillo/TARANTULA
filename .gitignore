@@ -23,6 +23,7 @@ pdf_extracted.txt
 temp_mermaid.py
 Explicacion_Trapezoidal.txt
 *.html
+!/web/*.html
 
 # OS specific files
 Thumbs.db
@@ -43,3 +44,9 @@ CLAUDE.md
 
 # scripts
 /scripts/generar_presentacion.py
+
+# Interfaz web: herramientas de conversión del CAD
+/tools/step2glb/node_modules/
+
+# Log de tramas CAN generado por CanLogger al ejecutar
+can_log.csv
