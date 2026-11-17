@@ -25,6 +25,10 @@
     QPushButton#btnStopAll:hover { background-color: #f38ba8; color: #1e1e2e; }
     QPushButton#btnSendCommandGrid { border-color: #a6e3a1; color: #a6e3a1; }
     QPushButton#btnResetPose { border-color: #89b4fa; color: #89b4fa; }
+    QPushButton#btnDisableIndividual { border-color: #f38ba8; color: #f38ba8; }
+    QPushButton#btnDisableIndividual:hover { background-color: #f38ba8; color: #1e1e2e; }
+    QPushButton#btnResetLog { border-color: #f9e2af; color: #f9e2af; }
+    QPushButton#btnResetLog:hover { background-color: #f9e2af; color: #1e1e2e; }
     QLineEdit { background-color: #181825; color: #cdd6f4; border: 1px solid #45475a; border-radius: 4px; padding: 5px; }
     QTableWidget { background-color: #181825; color: #cdd6f4; gridline-color: #313244; border: 1px solid #45475a; border-radius: 4px; }
     QHeaderView::section { background-color: #313244; color: #cdd6f4; padding: 4px; font-weight: bold; border: none; }
@@ -638,6 +642,16 @@
          </widget>
         </item>
         <item>
+         <widget class="QPushButton" name="btnDisableIndividual">
+          <property name="toolTip">
+           <string>Apaga (IDLE) el motor indicado en "ID motor"</string>
+          </property>
+          <property name="text">
+           <string>APAGAR</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="btnSendIndividual">
           <property name="text">
            <string>ENVIAR</string>
@@ -645,6 +659,16 @@
          </widget>
         </item>
        </layout>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnResetLog">
+        <property name="toolTip">
+         <string>Vacía el fichero can_log.csv del CanLogger</string>
+        </property>
+        <property name="text">
+         <string>RESET LOG CAN</string>
+        </property>
+       </widget>
       </item>
       <item>
        <spacer name="verticalSpacer_Right">
